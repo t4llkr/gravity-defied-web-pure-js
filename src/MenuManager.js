@@ -1049,24 +1049,45 @@ class MenuManager {
       return null;
     }
   }
-  saveProgressToStorage() {
+  saveProgressToStorage(withSelection = true) {
     try {
-      window.localStorage.setItem("gd-progress-" + this.currentPackId, JSON.stringify({
+      const key = "gd-progress-" + this.currentPackId;
+      let sel = null;
+      if (!withSelection) {
+        // смена пака: НЕ затираем выбор чужими позициями виджетов,
+        // оставляем ранее сохранённый (если пак реально игрался)
+        try {
+          const existing = window.localStorage.getItem(key);
+          if (existing !== null) {
+            const parsed = JSON.parse(existing);
+            if (Array.isArray(parsed.sel) && parsed.sel.length >= 3) {
+              sel = parsed.sel;
+            }
+          }
+        } catch {
+        }
+      }
+      const record = {
         al: this.availableLeagues,
         ml: this.maxAvailableLevel,
-        u: [this.unlockedTracksByLevel[0], this.unlockedTracksByLevel[1], this.unlockedTracksByLevel[2]],
-        sel: [
+        u: [this.unlockedTracksByLevel[0], this.unlockedTracksByLevel[1], this.unlockedTracksByLevel[2]]
+      };
+      if (sel !== null) {
+        record.sel = sel;
+      } else if (withSelection) {
+        record.sel = [
           this.settingStringLevel?.getCurrentOptionPos() ?? this.selectedLevelIndex,
           this.settingsStringTrack?.getCurrentOptionPos() ?? this.selectedTrackIndex,
           this.settingsStringLeague?.getCurrentOptionPos() ?? this.selectedLeagueIndex
-        ]
-      }));
+        ];
+      }
+      window.localStorage.setItem(key, JSON.stringify(record));
     } catch {
     }
   }
   setCurrentPack(packId) {
     if (this.currentPackId !== packId) {
-      this.saveProgressToStorage();
+      this.saveProgressToStorage(false);
     }
     this.currentPackId = packId;
     const data = this.loadProgressData(packId);
@@ -1087,7 +1108,7 @@ class MenuManager {
     this.settingStringLevel?.setAvailableOptions(this.maxAvailableLevel);
     if (data !== null && Array.isArray(data.sel) && data.sel.length >= 3) {
       this.settingsStringLeague?.setCurrentOptionPos(Math.min(data.sel[2], this.availableLeagues));
-      this.settingStringLevel?.setCurrentOptionPos(Math.min(data.sel[0], this.maxAvailableLevel));
+      this.settingStringLevel?.setCurrentOptionPos(Math.min(data.sel[0], Math.max(0, this.maxAvailableLevel - 1)));
       this.settingsStringTrack?.setCurrentOptionPos(data.sel[1]);
     }
     if (this.recordManager !== null) {
