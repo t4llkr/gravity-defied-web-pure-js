@@ -40,15 +40,13 @@ class PackMenu {
     this.gameMenuPacks.addMenuElement(this.taskBack);
     this.originalLoader = this.micro.levelLoader;
   }
-  applyLoader(loader, displayName) {
+  applyLoader(loader, packId) {
     this.micro.levelLoader = loader;
     if (this.micro.gamePhysics !== null) {
       this.micro.gamePhysics.levelLoader = loader;
     }
     this.menuManager.levelNames = loader.levelNames;
-    this.menuManager.unlockedTracksByLevel = [0, 0, 0];
-    this.menuManager.availableLeagues = 0;
-    this.menuManager.maxAvailableLevel = 1;
+    this.menuManager.setCurrentPack(packId);
   }
   getMainMenu() {
     return this.gameMenuPacks;
@@ -64,6 +62,12 @@ class PackMenu {
     this.rebuildPackListMenu();
     try {
       this.packList = await this.packManager.fetchPackList(this.currentPage);
+      try {
+        const cachedIds = new Set((await this.packManager.getCachedPacks()).map((m) => m.id));
+        this.packList = this.packList.filter((p) => !cachedIds.has(p.id));
+      } catch {
+        // кэш недоступен — показываем список как есть
+      }
       this.statusMessage = `Page ${this.currentPage}: ${this.packList.length} packs`;
     } catch (err) {
       this.statusMessage = "Error loading packs";
@@ -103,6 +107,37 @@ class PackMenu {
     const back = new BackItem("Back", this.gameMenuPacks, this.menuManager);
     this.gameMenuPackList.addMenuElement(back);
   }
+  computePackStats(packId) {
+    let played = 0;
+    const storagePrefix = "gravity_defied_record_store:";
+    const packPrefix = "p" + packId + "_";
+    for (let i = 0; i < window.localStorage.length; ++i) {
+      const rawKey = window.localStorage.key(i);
+      if (rawKey === null || !rawKey.startsWith(storagePrefix)) {
+        continue;
+      }
+      const key = rawKey.substring(storagePrefix.length);
+      if (packId === 0) {
+        if (/^[0-9]{2}$/.test(key)) {
+          ++played;
+        }
+      } else if (key.startsWith(packPrefix)) {
+        ++played;
+      }
+    }
+    let leagues = 0;
+    try {
+      const raw = window.localStorage.getItem("gd-progress-" + packId);
+      if (raw !== null) {
+        const data = JSON.parse(raw);
+        if (typeof data.al === "number") {
+          leagues = data.al;
+        }
+      }
+    } catch {
+    }
+    return { played, leagues };
+  }
   rebuildCachedPacksMenu(cachedPacks) {
     this.gameMenuCachedPacks.clearVector();
     this.gameMenuCachedPacks.addMenuElement(new TextRender(this.statusMessage, this.micro));
@@ -111,7 +146,14 @@ class PackMenu {
       this.gameMenuCachedPacks.addMenuElement(new TextRender("No cached packs", this.micro));
     } else {
       for (const meta of packs) {
-        const item = new CachedPackItem(meta.name, meta, this);
+        const stats = this.computePackStats(meta.id);
+        const totals = meta.id === 0 && this.originalLoader !== null ? {
+          tracksTotal: this.originalLoader.levelNames.reduce((acc, lvl) => acc + lvl.length, 0),
+          leaguesTotal: this.originalLoader.levelNames.length
+        } : meta;
+        const tracksPart = typeof totals.tracksTotal === "number" ? ` ${stats.played}/${totals.tracksTotal} tr` : ` ${stats.played} tr`;
+        const leaguesPart = typeof totals.leaguesTotal === "number" ? ` ${stats.leagues}/${totals.leaguesTotal} lg` : ` ${stats.leagues} lg`;
+        const item = new CachedPackItem(`${meta.name} —${tracksPart}${leaguesPart}`, meta, this);
         this.gameMenuCachedPacks.addMenuElement(item);
       }
     }
@@ -151,7 +193,12 @@ class PackMenu {
         return;
       }
       const newLoader = await LevelLoader.create(blobUrl);
-      this.applyLoader(newLoader, pack.name);
+      const tracksTotal = newLoader.levelNames.reduce((acc, lvl) => acc + lvl.length, 0);
+      void this.packManager.cache.updatePackMeta(pack.id, {
+        tracksTotal,
+        leaguesTotal: newLoader.levelNames.length
+      });
+      this.applyLoader(newLoader, pack.id);
       this.menuManager.showAlert("Pack Loaded", `${pack.name} ready!`, null);
       this.menuManager.openMenu(this.menuManager.gameMenuMain, false);
     } catch (err) {
@@ -162,7 +209,7 @@ class PackMenu {
   async onCachedPackSelected(meta) {
     if (meta.id === 0) {
       if (this.originalLoader !== null && this.originalLoader !== void 0) {
-        this.applyLoader(this.originalLoader, meta.name);
+        this.applyLoader(this.originalLoader, 0);
         this.menuManager.showAlert("Pack Loaded", "Original levels ready!", null);
         this.menuManager.openMenu(this.menuManager.gameMenuMain, false);
       }

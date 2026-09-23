@@ -76,6 +76,7 @@ class MenuManager {
   lastFinishTimeString = "";
   playerNameBytes = new Uint8Array([65, 65, 65]);
   unlockedTracksByLevel = new Int8Array(4);
+  currentPackId = 0;
   defaultInputString = new Uint8Array([65, 65, 65]);
   availableLeagues = 0;
   maxAvailableLevel = 0;
@@ -207,6 +208,18 @@ class MenuManager {
           this.maxAvailableLevel = this.readStoredValue(6, this.maxAvailableLevel);
           for (var4 = 0; var4 < 3; ++var4) {
             this.unlockedTracksByLevel[var4] = this.readStoredValue(7 + var4, this.unlockedTracksByLevel[var4]);
+          }
+        }
+        {
+          const migrated = this.loadProgressData(0);
+          if (migrated !== null) {
+            this.availableLeagues = migrated.al;
+            this.maxAvailableLevel = migrated.ml;
+            this.unlockedTracksByLevel[0] = migrated.u[0];
+            this.unlockedTracksByLevel[1] = migrated.u[1];
+            this.unlockedTracksByLevel[2] = migrated.u[2];
+          } else {
+            this.saveProgressToStorage();
           }
         }
         try {
@@ -750,6 +763,7 @@ class MenuManager {
     for (let i = 0; i < 3; ++i) {
       this.setValue(7 + i, this.unlockedTracksByLevel[i]);
     }
+    this.saveProgressToStorage();
     if (this.recordStore === null) {
       return;
     }
@@ -822,6 +836,8 @@ class MenuManager {
     if (menuElement === this.confirmYes) {
       if (this.currentGameMenu === this.gameMenuConfirmClear) {
         this.recordManager?.deleteRecordStores();
+        window.localStorage.removeItem("gd-progress-" + this.currentPackId);
+        this.setCurrentPack(this.currentPackId);
         this.showAlert("Cleared", "Highscores have been cleared", null);
       } else if (this.currentGameMenu === this.gameMenuConfirmReset) {
         this.exit();
@@ -1018,6 +1034,66 @@ class MenuManager {
       this.persistedStateBuffer[pos] = value;
     }
   }
+  loadProgressData(packId) {
+    try {
+      const raw = window.localStorage.getItem("gd-progress-" + packId);
+      if (raw === null) {
+        return null;
+      }
+      const d = JSON.parse(raw);
+      if (typeof d.al !== "number" || typeof d.ml !== "number" || !Array.isArray(d.u) || d.u.length < 3) {
+        return null;
+      }
+      return d;
+    } catch {
+      return null;
+    }
+  }
+  saveProgressToStorage() {
+    try {
+      window.localStorage.setItem("gd-progress-" + this.currentPackId, JSON.stringify({
+        al: this.availableLeagues,
+        ml: this.maxAvailableLevel,
+        u: [this.unlockedTracksByLevel[0], this.unlockedTracksByLevel[1], this.unlockedTracksByLevel[2]],
+        sel: [
+          this.settingStringLevel?.getCurrentOptionPos() ?? this.selectedLevelIndex,
+          this.settingsStringTrack?.getCurrentOptionPos() ?? this.selectedTrackIndex,
+          this.settingsStringLeague?.getCurrentOptionPos() ?? this.selectedLeagueIndex
+        ]
+      }));
+    } catch {
+    }
+  }
+  setCurrentPack(packId) {
+    if (this.currentPackId !== packId) {
+      this.saveProgressToStorage();
+    }
+    this.currentPackId = packId;
+    const data = this.loadProgressData(packId);
+    if (data !== null) {
+      this.availableLeagues = data.al;
+      this.maxAvailableLevel = data.ml;
+      this.unlockedTracksByLevel[0] = data.u[0];
+      this.unlockedTracksByLevel[1] = data.u[1];
+      this.unlockedTracksByLevel[2] = data.u[2];
+    } else {
+      this.availableLeagues = 0;
+      this.maxAvailableLevel = 1;
+      this.unlockedTracksByLevel[0] = 0;
+      this.unlockedTracksByLevel[1] = 0;
+      this.unlockedTracksByLevel[2] = -1;
+    }
+    this.settingsStringLeague?.setAvailableOptions(this.availableLeagues);
+    this.settingStringLevel?.setAvailableOptions(this.maxAvailableLevel);
+    if (data !== null && Array.isArray(data.sel) && data.sel.length >= 3) {
+      this.settingsStringLeague?.setCurrentOptionPos(Math.min(data.sel[2], this.availableLeagues));
+      this.settingStringLevel?.setCurrentOptionPos(Math.min(data.sel[0], this.maxAvailableLevel));
+      this.settingsStringTrack?.setCurrentOptionPos(data.sel[1]);
+    }
+    if (this.recordManager !== null) {
+      this.recordManager.packPrefix = packId === 0 ? "" : "p" + packId + "_";
+    }
+  }
   exit() {
     this.perspectiveSetting?.setCurrentOptionPos(0);
     this.shadowsSetting?.setCurrentOptionPos(0);
@@ -1039,6 +1115,12 @@ class MenuManager {
     this.availableLeagues = 0;
     this.persistState();
     this.recordManager?.deleteRecordStores();
+    for (let i = window.localStorage.length - 1; i >= 0; --i) {
+      const k = window.localStorage.key(i);
+      if (k !== null && k.startsWith("gd-progress-")) {
+        window.localStorage.removeItem(k);
+      }
+    }
   }
   getCountOfRecordStoresWithPrefix(prefixNumber) {
     const storeNames = RecordStore.listRecordStores();

@@ -12,10 +12,11 @@ class RecordManager {
   recordStore = null;
   packedRecordInfoRecordId = -1;
   packedRecordInfo = new Int8Array(96);
+  packPrefix = "";
   str = "";
   openRecordStoreForTrack(var1, var2) {
     this.resetRecordsTime();
-    this.str = `${var1}${var2}`;
+    this.str = `${this.packPrefix}${var1}${var2}`;
     this.recordStore = RecordStore.openRecordStore(this.str, true);
     this.packedRecordInfoRecordId = -1;
     const recordEnum = this.recordStore.enumerateRecords(null, null, false);

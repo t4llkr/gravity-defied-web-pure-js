@@ -13,7 +13,7 @@ class LevelLoader {
   edgeNormalsF16 = [];
   outerCollisionRadiusSqByShape = [0, 0, 0];
   innerCollisionRadiusSqByShape = [0, 0, 0];
-  static levelOffsetInFile = [[], [], []];
+  levelOffsetInFile = [[], [], []];
   edgeNormalsCapacity = 0;
   static visibleStartPointIndex = 0;
   static visibleEndPointIndex = 0;
@@ -49,11 +49,11 @@ class LevelLoader {
     const decoder = new TextDecoder("ascii");
     for (let league = 0; league < 3; ++league) {
       var4[league] = this.levelFileStream.readInt32(true);
-      LevelLoader.levelOffsetInFile[league] = new Array(var4[league]);
+      this.levelOffsetInFile[league] = new Array(var4[league]);
       this.levelNames[league] = new Array(var4[league]);
       for (let levelNo = 0; levelNo < var4[league]; ++levelNo) {
         const var7 = this.levelFileStream.readInt32(true);
-        LevelLoader.levelOffsetInFile[league][levelNo] = var7;
+        this.levelOffsetInFile[league][levelNo] = var7;
         const raw = new Uint8Array(40);
         let zeroIndex = 40;
         for (let var8 = 0; var8 < 40; ++var8) {
@@ -84,7 +84,7 @@ class LevelLoader {
     return this.currentTrackIndex;
   }
   readLevelFromArchive(var1, var2) {
-    this.levelFileStream.setPos(LevelLoader.levelOffsetInFile[var1 - 1][var2 - 1]);
+    this.levelFileStream.setPos(this.levelOffsetInFile[var1 - 1][var2 - 1]);
     if (this.gameLevel === null) {
       this.gameLevel = new GameLevel();
     }

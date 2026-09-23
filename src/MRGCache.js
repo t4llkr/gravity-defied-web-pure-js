@@ -56,6 +56,23 @@ class MRGCache {
     const blob = new Blob([pack.mrgBuffer], { type: "application/octet-stream" });
     return URL.createObjectURL(blob);
   }
+  async updatePackMeta(id, patch) {
+    if (!this.db) await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE_METADATA, "readwrite");
+      const request = tx.objectStore(STORE_METADATA).get(id);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const existing = request.result;
+        if (!existing) {
+          resolve(false);
+          return;
+        }
+        tx.objectStore(STORE_METADATA).put({ ...existing, ...patch });
+        resolve(true);
+      };
+    });
+  }
   async getAllMetadata() {
     if (!this.db) await this.open();
     return new Promise((resolve, reject) => {

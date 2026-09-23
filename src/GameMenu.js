@@ -63,8 +63,8 @@ class GameMenu {
       this.isNameEntryMenu = false;
       this.strArr = null;
     }
-    if (this.visibleItemCount > 13) {
-      this.visibleItemCount = 13;
+    if (this.visibleItemCount > 20) {
+      this.visibleItemCount = 20;
     }
   }
   setRowSpacing(var1) {
@@ -131,8 +131,8 @@ class GameMenu {
       }
       ++this.visibleItemCount;
     }
-    if (this.visibleItemCount > 13) {
-      this.visibleItemCount = 13;
+    if (this.visibleItemCount > 20) {
+      this.visibleItemCount = 20;
     }
     this.selectFirstMenuItem();
   }
