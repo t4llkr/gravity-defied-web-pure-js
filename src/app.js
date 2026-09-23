@@ -18,6 +18,8 @@ async function startGravityDefiedApp(root) {
   micro.levelLoader = levelLoader;
   micro.gamePhysics = gamePhysics;
   micro.gameCanvas = gameCanvas;
+  window.__gd = { micro, menuManager };
+  window.addEventListener("pagehide", () => menuManager.saveAndClose());
   micro.menuManager = menuManager;
   gameCanvas.init(gamePhysics);
   for (let i = 1; i <= 7; ++i) {

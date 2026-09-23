@@ -794,6 +794,7 @@ class MenuManager {
         this.micro.gamePhysics?.disableGenerateInputAI();
         this.micro.levelLoader?.loadLevel(this.settingStringLevel.getCurrentOptionPos(), this.settingsStringTrack.getCurrentOptionPos());
         this.micro.gamePhysics?.setMotoLeague(this.settingsStringLeague.getCurrentOptionPos());
+        this.saveProgressToStorage();
         this.restartRequested = true;
         this.micro.menuToGame();
       } else {
@@ -1053,6 +1054,7 @@ class MenuManager {
     try {
       const key = "gd-progress-" + this.currentPackId;
       let sel = null;
+      let st = null;
       if (!withSelection) {
         // смена пака: НЕ затираем выбор чужими позициями виджетов,
         // оставляем ранее сохранённый (если пак реально игрался)
@@ -1062,6 +1064,9 @@ class MenuManager {
             const parsed = JSON.parse(existing);
             if (Array.isArray(parsed.sel) && parsed.sel.length >= 3) {
               sel = parsed.sel;
+            }
+            if (Array.isArray(parsed.st)) {
+              st = parsed.st;
             }
           }
         } catch {
@@ -1080,6 +1085,11 @@ class MenuManager {
           this.settingsStringTrack?.getCurrentOptionPos() ?? this.selectedTrackIndex,
           this.settingsStringLeague?.getCurrentOptionPos() ?? this.selectedLeagueIndex
         ];
+      }
+      if (st !== null) {
+        record.st = st;
+      } else if (withSelection) {
+        record.st = [...this.selectedTrackByLevel];
       }
       window.localStorage.setItem(key, JSON.stringify(record));
     } catch {
@@ -1106,10 +1116,26 @@ class MenuManager {
     }
     this.settingsStringLeague?.setAvailableOptions(this.availableLeagues);
     this.settingStringLevel?.setAvailableOptions(this.maxAvailableLevel);
+    this.settingsStringLeague?.setAvailableOptions(this.availableLeagues);
+    this.settingStringLevel?.setAvailableOptions(this.maxAvailableLevel);
+    if (data !== null && Array.isArray(data.st)) {
+      for (let i = 0; i < Math.min(data.st.length, this.selectedTrackByLevel.length); ++i) {
+        this.selectedTrackByLevel[i] = data.st[i];
+      }
+    } else {
+      for (let i = 0; i < this.selectedTrackByLevel.length; ++i) {
+        this.selectedTrackByLevel[i] = 0;
+      }
+    }
     if (data !== null && Array.isArray(data.sel) && data.sel.length >= 3) {
       this.settingsStringLeague?.setCurrentOptionPos(Math.min(data.sel[2], this.availableLeagues));
       this.settingStringLevel?.setCurrentOptionPos(Math.min(data.sel[0], Math.max(0, this.maxAvailableLevel - 1)));
       this.settingsStringTrack?.setCurrentOptionPos(data.sel[1]);
+    } else {
+      // сохранённого выбора нет — начинаем пак с первой позиции
+      this.settingsStringLeague?.setCurrentOptionPos(0);
+      this.settingStringLevel?.setCurrentOptionPos(0);
+      this.settingsStringTrack?.setCurrentOptionPos(0);
     }
     if (this.recordManager !== null) {
       this.recordManager.packPrefix = packId === 0 ? "" : "p" + packId + "_";
@@ -1146,9 +1172,11 @@ class MenuManager {
   getCountOfRecordStoresWithPrefix(prefixNumber) {
     const storeNames = RecordStore.listRecordStores();
     if (this.recordManager !== null && storeNames.length !== 0) {
+      const packPrefix = this.currentPackId === 0 ? "" : "p" + this.currentPackId + "_";
+      const fullPrefix = packPrefix + String(prefixNumber);
       let count = 0;
       for (let i = 0; i < storeNames.length; ++i) {
-        if (storeNames[i].startsWith(String(prefixNumber))) {
+        if (storeNames[i].startsWith(fullPrefix)) {
           ++count;
         }
       }
