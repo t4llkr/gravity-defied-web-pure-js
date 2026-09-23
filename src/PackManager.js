@@ -1,6 +1,11 @@
 import { MRGCache } from "./MRGCache.js";
 const GDMOD_BASE = "https://gdmod.ru";
+const CLOUDFLARE_PROXY = "https://lively-dream-dcdb.myorgbot.workers.dev/?url=";
+const IS_LOCAL = ["localhost", "127.0.0.1"].includes(location.hostname);
 const CORS_PROXIES = [
+  ...(IS_LOCAL ? ["/proxy/"] : []),
+  // локальный прокси из server.py при разработке; в проде — только воркер
+  CLOUDFLARE_PROXY,
   "https://api.allorigins.win/raw?url=",
   // raw-ответ, без ключей, без жёстких лимитов
   "https://api.codetabs.com/v1/proxy?quest=",

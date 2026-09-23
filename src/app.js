@@ -68,7 +68,7 @@ async function startGravityDefiedApp(root) {
     state.lastGoalLoopStepMs = 0;
     state.forcedRestartMs = 0;
     if (var1) {
-      gameCanvas.scheduleGameTimerTask(levelLoader.getName(menuManager.getCurrentLevel(), menuManager.getCurrentTrack()), 3e3);
+      gameCanvas.scheduleGameTimerTask(micro.levelLoader.getName(menuManager.getCurrentLevel(), menuManager.getCurrentTrack()), 3e3);
     }
     gameCanvas.resetInputState();
   }

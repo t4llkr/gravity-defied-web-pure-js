@@ -598,16 +598,16 @@ class MenuManager {
     }
   }
   fillCanvasWithImage(graphics) {
-    const rasterHeight = this.rasterImage.getHeight();
-    const rasterWidth = this.rasterImage.getWidth();
-    if (rasterHeight <= 0 || rasterWidth <= 0) {
-      return; // изображение ещё не загрузилось — пропускаем кадр
-    }
     if (this.rasterImage === null) {
       return;
     }
-    for (let y = 0; y < this.getCanvasHeight(); y += this.rasterImage.getHeight()) {
-      for (let x = 0; x < this.getCanvasWidth(); x += this.rasterImage.getWidth()) {
+    const rasterHeight = this.rasterImage.getHeight();
+    const rasterWidth = this.rasterImage.getWidth();
+    if (rasterHeight <= 0 || rasterWidth <= 0) {
+      return;
+    }
+    for (let y = 0; y < this.getCanvasHeight(); y += rasterHeight) {
+      for (let x = 0; x < this.getCanvasWidth(); x += rasterWidth) {
         graphics.drawImage(this.rasterImage, x, y, Graphics.LEFT | Graphics.TOP);
       }
     }
@@ -927,10 +927,15 @@ class MenuManager {
       this.gameMenuLeague?.scrollToSelection(this.settingsStringLeague.getCurrentOptionPos());
     }
     if (menuElement === this.taskLevelPacks) {
-      if (this.packMenu) {
-        void this.packMenu.loadPackListPage();
-        this.openMenu(this.packMenu.getBrowseMenu(), false);
-      }
+      // обычный пункт с подменю: parent/открытие корректно делает menuElemMethod
+      return;
+    }
+    if (menuElement === this.packMenu?.taskBrowsePacks) {
+      void this.packMenu.loadPackListPage();
+      return;
+    }
+    if (menuElement === this.packMenu?.taskCachedPacks) {
+      void this.packMenu.loadCachedPacksPage();
       return;
     }
   }

@@ -38,6 +38,17 @@ class PackMenu {
     this.gameMenuPacks.addMenuElement(this.taskBrowsePacks);
     this.gameMenuPacks.addMenuElement(this.taskCachedPacks);
     this.gameMenuPacks.addMenuElement(this.taskBack);
+    this.originalLoader = this.micro.levelLoader;
+  }
+  applyLoader(loader, displayName) {
+    this.micro.levelLoader = loader;
+    if (this.micro.gamePhysics !== null) {
+      this.micro.gamePhysics.levelLoader = loader;
+    }
+    this.menuManager.levelNames = loader.levelNames;
+    this.menuManager.unlockedTracksByLevel = [0, 0, 0];
+    this.menuManager.availableLeagues = 0;
+    this.menuManager.maxAvailableLevel = 1;
   }
   getMainMenu() {
     return this.gameMenuPacks;
@@ -66,7 +77,10 @@ class PackMenu {
     try {
       const cached = await this.packManager.getCachedPacks();
       this.statusMessage = `${cached.length} cached packs`;
-      this.rebuildCachedPacksMenu(cached);
+      this.rebuildCachedPacksMenu([
+        { id: 0, name: "Original levels", author: "built-in", levels: "", mrgSize: "", hasGdlvl: false },
+        ...cached
+      ]);
     } catch (err) {
       this.statusMessage = "Error loading cached";
       console.error(err);
@@ -137,11 +151,7 @@ class PackMenu {
         return;
       }
       const newLoader = await LevelLoader.create(blobUrl);
-      this.micro.levelLoader = newLoader;
-      this.menuManager.levelNames = newLoader.levelNames;
-      this.menuManager.unlockedTracksByLevel = [0, 0, 0];
-      this.menuManager.availableLeagues = 0;
-      this.menuManager.maxAvailableLevel = 1;
+      this.applyLoader(newLoader, pack.name);
       this.menuManager.showAlert("Pack Loaded", `${pack.name} ready!`, null);
       this.menuManager.openMenu(this.menuManager.gameMenuMain, false);
     } catch (err) {
@@ -150,6 +160,14 @@ class PackMenu {
     }
   }
   async onCachedPackSelected(meta) {
+    if (meta.id === 0) {
+      if (this.originalLoader !== null && this.originalLoader !== void 0) {
+        this.applyLoader(this.originalLoader, meta.name);
+        this.menuManager.showAlert("Pack Loaded", "Original levels ready!", null);
+        this.menuManager.openMenu(this.menuManager.gameMenuMain, false);
+      }
+      return;
+    }
     await this.downloadAndLoadPack({
       id: meta.id,
       name: meta.name,
