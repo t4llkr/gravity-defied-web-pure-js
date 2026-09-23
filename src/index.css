@@ -1,0 +1,61 @@
+:root {
+  color: #0f0e09;
+  background:
+    radial-gradient(circle at top, #f1d78d 0%, #e1c26e 22%, #ae8e49 54%, #5b4623 100%);
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  width: 100vw;
+  height: 100vh;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+.app-root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.game-canvas {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  display: block;
+  image-rendering: pixelated;
+  background: #ffffff;
+  touch-action: none;
+}
+
+.error-view {
+  width: min(100%, 760px);
+  padding: 20px 24px;
+  white-space: pre-wrap;
+  color: #fff6dc;
+  background: rgba(31, 16, 7, 0.88);
+  border: 2px solid rgba(255, 235, 183, 0.65);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+}
