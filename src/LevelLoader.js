@@ -170,6 +170,12 @@ class LevelLoader {
     yF16 >>= 1;
     this.gameLevel.renderLevel3D(gameCanvas, xF16, yF16);
   }
+  renderTrackEffects(gameCanvas, xF16, yF16, withFill = true) {
+    if (this.gameLevel === null) {
+      return;
+    }
+    this.gameLevel.renderTrackEffects(gameCanvas, xF16 >> 1, yF16 >> 1, withFill);
+  }
   renderTrackNearestLine(canvas) {
     if (this.gameLevel === null) {
       return;

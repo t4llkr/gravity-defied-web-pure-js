@@ -307,9 +307,9 @@ class MenuManager {
         this.gameMenuMain?.addMenuElement(this.taskPlayMenu);
         this.gameMenuMain?.addMenuElement(this.taskOptions);
         this.gameMenuMain?.addMenuElement(this.taskHelp);
-        this.gameMenuMain?.addMenuElement(this.taskAbout);
         this.gameMenuMain?.addMenuElement(this.taskLevelPacks);
         this.gameMenuMain?.addMenuElement(this.taskVisuals);
+        this.gameMenuMain?.addMenuElement(this.taskAbout);
         this.gameMenuMain?.addMenuElement(this.settingStringExitGame);
         this.settingStringLevel = new SettingsStringRender("Level", this.selectedLevelIndex, this, this.levelDifficultyNames, false, this.micro, this.gameMenuPlay, false);
         this.settingsStringTrack = new SettingsStringRender("Track", this.selectedTrackByLevel[this.selectedLevelIndex], this, this.levelNames[this.selectedLevelIndex], false, this.micro, this.gameMenuPlay, false);

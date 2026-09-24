@@ -130,64 +130,7 @@ class GameLevel {
     var9 = divideF16(var9, var11 >> 1 >> 1);
     var10 = divideF16(var10, var11 >> 1 >> 1);
     gameCanvas.setColor(...VisualSettings.lineRGB());
-    {
-      const fillOn = VisualSettings.settings.fillEnabled;
-      const curtainOn = VisualSettings.settings.curtainEnabled;
-      if (fillOn || curtainOn) {
-        const bottomY = gameCanvas.addDy(0) - (gameCanvas.height2 + 100);
-        const curtainQuads = [];
-        const fillBuckets = new Map();
-        const trackOffset = (idx) => {
-          let ox = xF16 - this.pointPositions[idx][0];
-          let oy = yF16 + 3276800 - this.pointPositions[idx][1];
-          const len = GamePhysics.getSmthLikeMaxAbs(ox, oy);
-          ox = divideF16(ox, len >> 1 >> 1);
-          oy = divideF16(oy, len >> 1 >> 1);
-          return [ox, oy];
-        };
-        let prevOff = trackOffset(lineNo);
-        for (let seg = lineNo; seg < this.pointsCount - 1; seg++) {
-          const xi = this.pointPositions[seg][0] << 3 >> 16;
-          const yi = this.pointPositions[seg][1] << 3 >> 16;
-          const xj = this.pointPositions[seg + 1][0] << 3 >> 16;
-          const yj = this.pointPositions[seg + 1][1] << 3 >> 16;
-          if (curtainOn) {
-            curtainQuads.push([[xi, yi], [xj, yj], [xj, bottomY], [xi, bottomY]]);
-          }
-          if (fillOn) {
-            const off = trackOffset(seg + 1);
-            const shade = VisualSettings.shadeFactor(this.pointPositions[seg + 1][0] - this.pointPositions[seg][0], this.pointPositions[seg + 1][1] - this.pointPositions[seg][1]);
-            const key = Math.round(shade * 16);
-            let bucket = fillBuckets.get(key);
-            if (bucket === undefined) {
-              bucket = { shade, quads: [] };
-              fillBuckets.set(key, bucket);
-            }
-            bucket.quads.push([
-              [xi, yi],
-              [xj, yj],
-              [this.pointPositions[seg + 1][0] + off[0] << 3 >> 16, this.pointPositions[seg + 1][1] + off[1] << 3 >> 16],
-              [this.pointPositions[seg][0] + prevOff[0] << 3 >> 16, this.pointPositions[seg][1] + prevOff[1] << 3 >> 16]
-            ]);
-            prevOff = off;
-          }
-          if (this.pointPositions[seg][0] > this.maxX) {
-            break;
-          }
-        }
-        if (curtainQuads.length !== 0) {
-          const cb = VisualSettings.fillRGB();
-          gameCanvas.setColor(cb[0], cb[1], cb[2]);
-          gameCanvas.fillPolygonPath(gameCanvas.buildPolygonPath(curtainQuads));
-        }
-        for (const bucket of fillBuckets.values()) {
-          const fb = VisualSettings.fillRGB();
-          gameCanvas.setColor(Math.min(255, fb[0] * bucket.shade | 0), Math.min(255, fb[1] * bucket.shade | 0), Math.min(255, fb[2] * bucket.shade | 0));
-          gameCanvas.fillPolygonPath(gameCanvas.buildPolygonPath(bucket.quads));
-        }
-        gameCanvas.setColor(...VisualSettings.lineRGB());
-      }
-    }
+    this.renderTrackEffects(gameCanvas, xF16, yF16);
     while (lineNo < this.pointsCount - 1) {
       const var4 = var9;
       const var5 = var10;
@@ -245,6 +188,72 @@ class GameLevel {
       this.renderShadow(gameCanvas, var7, var8);
     }
   }
+
+  renderTrackEffects(gameCanvas, xF16, yF16, withFill = true) {
+    let lineNo = 0;
+    for (lineNo = 0; lineNo < this.pointsCount - 1 && this.pointPositions[lineNo][0] <= this.minX; ++lineNo) {
+    }
+    if (lineNo > 0) {
+      --lineNo;
+    }
+  const fillOn = withFill && VisualSettings.settings.fillEnabled;
+    const curtainOn = VisualSettings.settings.curtainEnabled;
+    if (fillOn || curtainOn) {
+      const bottomY = gameCanvas.addDy(0) - (gameCanvas.height2 + 100);
+      const curtainQuads = [];
+      const fillBuckets = new Map();
+      const trackOffset = (idx) => {
+        let ox = xF16 - this.pointPositions[idx][0];
+        let oy = yF16 + 3276800 - this.pointPositions[idx][1];
+        const len = GamePhysics.getSmthLikeMaxAbs(ox, oy);
+        ox = divideF16(ox, len >> 1 >> 1);
+        oy = divideF16(oy, len >> 1 >> 1);
+        return [ox, oy];
+      };
+      let prevOff = trackOffset(lineNo);
+      for (let seg = lineNo; seg < this.pointsCount - 1; seg++) {
+        const xi = this.pointPositions[seg][0] << 3 >> 16;
+        const yi = this.pointPositions[seg][1] << 3 >> 16;
+        const xj = this.pointPositions[seg + 1][0] << 3 >> 16;
+        const yj = this.pointPositions[seg + 1][1] << 3 >> 16;
+        if (curtainOn) {
+          curtainQuads.push([[xi, yi], [xj, yj], [xj, bottomY], [xi, bottomY]]);
+        }
+        if (fillOn) {
+          const off = trackOffset(seg + 1);
+          const shade = VisualSettings.shadeFactor(this.pointPositions[seg + 1][0] - this.pointPositions[seg][0], this.pointPositions[seg + 1][1] - this.pointPositions[seg][1]);
+          const key = Math.round(shade * 16);
+          let bucket = fillBuckets.get(key);
+          if (bucket === undefined) {
+            bucket = { shade, quads: [] };
+            fillBuckets.set(key, bucket);
+          }
+          bucket.quads.push([
+            [xi, yi],
+            [xj, yj],
+            [this.pointPositions[seg + 1][0] + off[0] << 3 >> 16, this.pointPositions[seg + 1][1] + off[1] << 3 >> 16],
+            [this.pointPositions[seg][0] + prevOff[0] << 3 >> 16, this.pointPositions[seg][1] + prevOff[1] << 3 >> 16]
+          ]);
+          prevOff = off;
+        }
+        if (this.pointPositions[seg][0] > this.maxX) {
+          break;
+        }
+      }
+      if (curtainQuads.length !== 0) {
+        const cb = VisualSettings.fillRGB();
+        gameCanvas.setColor(cb[0], cb[1], cb[2]);
+        gameCanvas.fillPolygonPath(gameCanvas.buildPolygonPath(curtainQuads));
+      }
+      for (const bucket of fillBuckets.values()) {
+        const fb = VisualSettings.fillRGB();
+        gameCanvas.setColor(Math.min(255, fb[0] * bucket.shade | 0), Math.min(255, fb[1] * bucket.shade | 0), Math.min(255, fb[2] * bucket.shade | 0));
+        gameCanvas.fillPolygonPath(gameCanvas.buildPolygonPath(bucket.quads));
+      }
+      gameCanvas.setColor(...VisualSettings.lineRGB());
+    }
+  }
+
   renderTrackNearestGreenLine(gameCanvas) {
     let pointNo = 0;
     for (pointNo = 0; pointNo < this.pointsCount - 1 && this.pointPositions[pointNo][0] <= this.minX; ++pointNo) {

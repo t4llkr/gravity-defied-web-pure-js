@@ -1081,6 +1081,8 @@ class GamePhysics {
     }
     if (LevelLoader.isEnabledPerspective) {
       this.levelLoader.renderLevel3D(gameCanvas, this.motoComponents[0].xF16, this.motoComponents[0].yF16);
+    } else {
+      this.levelLoader.renderTrackEffects(gameCanvas, this.motoComponents[0].xF16, this.motoComponents[0].yF16, false);
     }
     if (this.isRenderMotoWithSprites) {
       this.renderEngine(gameCanvas, xxF16, yyF16);
