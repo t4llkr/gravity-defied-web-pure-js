@@ -867,10 +867,10 @@ class MenuManager {
     }
     if (menuElement === this.confirmYes) {
       if (this.currentGameMenu === this.gameMenuConfirmClear) {
-        this.recordManager?.deleteRecordStores();
+        this.recordManager?.deleteRecordStoresForCurrentPack();
         window.localStorage.removeItem("gd-progress-" + this.currentPackId);
         this.setCurrentPack(this.currentPackId);
-        this.showAlert("Cleared", "Highscores have been cleared", null);
+        this.showAlert("Cleared", "This pack's records and progress cleared", null);
       } else if (this.currentGameMenu === this.gameMenuConfirmReset) {
         this.exit();
         this.showAlert("Reset", "Master reset. Application will be closed.", null);

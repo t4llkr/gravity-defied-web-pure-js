@@ -152,6 +152,22 @@ class RecordManager {
       }
     }
   }
+  deleteRecordStoresForCurrentPack() {
+    const prefix = this.packPrefix;
+    const names = RecordStore.listRecordStores();
+    for (const name of names) {
+      if (name === "GWTRStates") {
+        continue;
+      }
+      if (prefix === "") {
+        if (/^[0-9]{2}$/.test(name)) {
+          RecordStore.deleteRecordStore(name);
+        }
+      } else if (name.startsWith(prefix)) {
+        RecordStore.deleteRecordStore(name);
+      }
+    }
+  }
   deleteRecordStores() {
     const names = RecordStore.listRecordStores();
     for (const name of names) {

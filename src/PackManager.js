@@ -79,10 +79,28 @@ class PackManager {
     this.currentProxy = proxy;
     return resp;
   }
+  // gdmod.ru отдаёт страницы в windows-1251: resp.text() дал бы mojibake (�/ромбы)
+  async readResponseText(resp) {
+    const buf = await resp.arrayBuffer();
+    const ct = resp.headers.get("content-type") || "";
+    const m = ct.match(/charset=([^;]+)/i);
+    if (m) {
+      try {
+        return new TextDecoder(m[1].trim()).decode(buf);
+      } catch {
+        return new TextDecoder("windows-1251").decode(buf);
+      }
+    }
+    try {
+      return new TextDecoder("utf-8", { fatal: true }).decode(buf);
+    } catch {
+      return new TextDecoder("windows-1251").decode(buf);
+    }
+  }
   async fetchPackList(page = 1, perPage = 50) {
     const url = `${GDMOD_BASE}/tracks/?onpage=${perPage}&page=${page}`;
     const resp = await this.fetchWithProxy(url);
-    const html = await resp.text();
+    const html = await this.readResponseText(resp);
     return this.parsePackListHtml(html);
   }
   parsePackListHtml(html) {
@@ -115,7 +133,7 @@ class PackManager {
   async fetchPackDetail(id) {
     const url = `${GDMOD_BASE}/tracks/id/${id}`;
     const resp = await this.fetchWithProxy(url);
-    const html = await resp.text();
+    const html = await this.readResponseText(resp);
     return this.parsePackDetailHtml(html, id);
   }
   parsePackDetailHtml(html, id) {
