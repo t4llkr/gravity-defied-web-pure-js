@@ -312,11 +312,11 @@ class GameCanvas {
     this.setColor(0, 0, 0);
     this.graphics.setFont(FontStorage.getFont(Font.STYLE_BOLD, Font.SIZE_MEDIUM));
     if (time10Ms > 36e5) {
-      this.graphics.drawString("0:00.", this.width - GameCanvas.defaultFontWidth00, this.height2 - 5, Graphics.RIGHT | Graphics.TOP);
-      this.graphics.drawString("00", this.width - GameCanvas.defaultFontWidth00, this.height2 - 5, Graphics.LEFT | Graphics.TOP);
+      this.graphics.drawString("0:00.", this.width - GameCanvas.defaultFontWidth00, this.height2 - 20, Graphics.RIGHT | Graphics.TOP);
+      this.graphics.drawString("00", this.width - GameCanvas.defaultFontWidth00, this.height2 - 20, Graphics.LEFT | Graphics.TOP);
     } else {
-      this.graphics.drawString(GameCanvas.stringWithTime, this.width - GameCanvas.defaultFontWidth00, this.height2 - 5, Graphics.RIGHT | Graphics.TOP);
-      this.graphics.drawString(this.time10MsToStringCache[time10MsPart], this.width - GameCanvas.defaultFontWidth00, this.height2 - 5, Graphics.LEFT | Graphics.TOP);
+      this.graphics.drawString(GameCanvas.stringWithTime, this.width - GameCanvas.defaultFontWidth00, this.height2 - 20, Graphics.RIGHT | Graphics.TOP);
+      this.graphics.drawString(this.time10MsToStringCache[time10MsPart], this.width - GameCanvas.defaultFontWidth00, this.height2 - 20, Graphics.LEFT | Graphics.TOP);
     }
   }
   handleTimerFired(var1) {
