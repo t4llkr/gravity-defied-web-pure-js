@@ -6,6 +6,7 @@ export class VisualSettings {
     fillEnabled: false,
     fillColor: "#008800",
     fillMode: "gradient",
+    textColor: "#000000",
     curtainEnabled: false,
     bgImageMode: "fill",
     showBgImage: true
@@ -102,6 +103,9 @@ export class VisualSettings {
   }
   static fillRGB() {
     return this.rgb(this.settings.fillColor);
+  }
+  static textRGB() {
+    return this.rgb(this.settings.textColor);
   }
   // Яркостной множитель по наклону сегмента (dx, dy — любая шкала, важен угол).
   // gradient: плавно 0.6..1.3; steps: 3 ступени (0.78 / 1.0 / 1.22).

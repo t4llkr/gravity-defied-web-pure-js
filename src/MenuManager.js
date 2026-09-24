@@ -286,6 +286,7 @@ class MenuManager {
         this.taskLevelPacks = new TimerOrMotoPartOrMenuElem("Level Packs", this.packMenu.getMainMenu(), this);
         this.taskLineColor = new TimerOrMotoPartOrMenuElem("Line color", null, this);
         this.taskBgColor = new TimerOrMotoPartOrMenuElem("Background color", null, this);
+        this.taskTextColor = new TimerOrMotoPartOrMenuElem("Text color", null, this);
         this.fillSetting = new SettingsStringRender("Track fill", VisualSettings.settings.fillEnabled ? 0 : 1, this, this.toggleOptionNames, true, this.micro, this.gameMenuVisuals, false);
         this.taskFillColor = new TimerOrMotoPartOrMenuElem("Fill color", null, this);
         this.fillModeSetting = new SettingsStringRender("Shading", VisualSettings.settings.fillMode === "gradient" ? 0 : 1, this, ["Smooth", "Steps"], true, this.micro, this.gameMenuVisuals, false);
@@ -295,6 +296,7 @@ class MenuManager {
         this.showBgSetting = new SettingsStringRender("Show image", VisualSettings.settings.showBgImage ? 0 : 1, this, this.toggleOptionNames, true, this.micro, this.gameMenuVisuals, false);
         this.gameMenuVisuals?.addMenuElement(this.taskLineColor);
         this.gameMenuVisuals?.addMenuElement(this.taskBgColor);
+        this.gameMenuVisuals?.addMenuElement(this.taskTextColor);
         this.gameMenuVisuals?.addMenuElement(this.fillSetting);
         this.gameMenuVisuals?.addMenuElement(this.taskFillColor);
         this.gameMenuVisuals?.addMenuElement(this.fillModeSetting);
@@ -1024,6 +1026,12 @@ class MenuManager {
     if (menuElement === this.taskFillColor) {
       pickColor(VisualSettings.settings.fillColor, (hex) => {
         VisualSettings.settings.fillColor = hex;
+      });
+      return;
+    }
+    if (menuElement === this.taskTextColor) {
+      pickColor(VisualSettings.settings.textColor, (hex) => {
+        VisualSettings.settings.textColor = hex;
       });
       return;
     }

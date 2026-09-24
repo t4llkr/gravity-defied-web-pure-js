@@ -342,7 +342,7 @@ class GameCanvas {
       const zeroPadding = time10MsPart >= 10 ? "" : "0";
       this.time10MsToStringCache[time10MsPart] = `${zeroPadding}${time10Ms % 100}`;
     }
-    this.setColor(0, 0, 0);
+    this.setColor(...VisualSettings.textRGB());
     this.graphics.setFont(FontStorage.getFont(Font.STYLE_BOLD, Font.SIZE_MEDIUM));
     if (time10Ms > 36e5) {
       this.graphics.drawString("0:00.", this.width - GameCanvas.defaultFontWidth00, this.height2 - 20, Graphics.RIGHT | Graphics.TOP);
@@ -367,7 +367,7 @@ class GameCanvas {
     if (GameCanvas.flagAnimationTime > 229376) {
       GameCanvas.flagAnimationTime = 0;
     }
-    this.setColor(0, 0, 0);
+    this.setColor(...VisualSettings.textRGB());
     this.drawLine(x, y, x, y + 32);
     this.drawSprite(this.graphics, this.startFlagAnimationTimeToSpriteNo[GameCanvas.flagAnimationTime >> 16], this.addDx(x), this.addDy(y) - 32);
   }
@@ -375,7 +375,7 @@ class GameCanvas {
     if (GameCanvas.flagAnimationTime > 229376) {
       GameCanvas.flagAnimationTime = 0;
     }
-    this.setColor(0, 0, 0);
+    this.setColor(...VisualSettings.textRGB());
     this.drawLine(x, y, x, y + 32);
     this.drawSprite(this.graphics, this.finishFlagAnumationTimeToSpriteNo[GameCanvas.flagAnimationTime >> 16], this.addDx(x), this.addDy(y) - 32);
   }
@@ -504,7 +504,7 @@ class GameCanvas {
     if (this.timerMessage.length === 0) {
       return;
     }
-    this.setColor(0, 0, 0);
+    this.setColor(...VisualSettings.textRGB());
     this.graphics.setFont(this.screenFont);
     if (this.height2 <= 128) {
       this.graphics.drawString(this.timerMessage, Math.trunc(this.width / 2), 1, Graphics.HCENTER | Graphics.TOP);
