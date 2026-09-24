@@ -42,17 +42,9 @@ class PackManager {
     if (this.customProxy !== null) {
       return this.tryFetch(this.customProxy + url, this.customProxy, url);
     }
-    // сначала пробуем напрямую (вдруг у сайта появились CORS-заголовки)
-    try {
-      const resp = await fetch(url);
-      if (resp.ok) {
-        this.currentProxy = "";
-        return resp;
-      }
-    } catch {
-      // CORS-блок или сеть — идём через прокси
-    }
-    const errors = ["direct → CORS/сеть"];
+    // прямой запрос не делаем: gdmod.ru не отдаёт CORS-заголовки,
+    // а браузер при этом пишет ошибку в консоль при каждом обращении
+    const errors = [];
     for (const proxy of CORS_PROXIES) {
       // часть прокси ждёт URL закодированным, часть — сырым; пробуем оба варианта
       const variants = [...new Set([proxy + encodeURIComponent(url), proxy + url])];

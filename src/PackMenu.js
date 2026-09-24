@@ -189,9 +189,15 @@ class PackMenu {
     }
   }
   goToNextPage() {
+    const pm = this.packManager;
+    // упреждающая блокировка: конец каталога известен — не инкрементируем и не дёргаем сеть
+    const nextStart = this.currentPage * 20;
+    if (pm.catalogEnd !== null && nextStart >= pm.catalogEnd) {
+      this.statusMessage = "No more packs";
+      return;
+    }
     this.currentPage++;
     void this.loadPackListPage().then(() => {
-      const pm = this.packManager;
       const start = (this.currentPage - 1) * 20;
       if (this.currentPage > 1 && pm.catalogEnd !== null && start >= pm.catalogEnd) {
         this.currentPage--;
