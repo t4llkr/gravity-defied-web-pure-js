@@ -1211,7 +1211,7 @@ class MenuManager {
       this.unlockedTracksByLevel[2] = data.u[2];
     } else {
       this.availableLeagues = 0;
-      this.maxAvailableLevel = 0;
+      this.maxAvailableLevel = 1;
       this.unlockedTracksByLevel[0] = 0;
       this.unlockedTracksByLevel[1] = 0;
       this.unlockedTracksByLevel[2] = -1;
