@@ -97,6 +97,40 @@ class PackManager {
       return new TextDecoder("windows-1251").decode(buf);
     }
   }
+  // === Оконный кэш каталога: тянем по 200 паков с сервера, отдаём UI-страницами по 20 ===
+  windowItems = [];
+  windowStart = 0;
+  windowEnd = 0;
+  catalogEnd = null;
+  static WINDOW_SIZE = 200;
+  async fetchWindow(globalStart) {
+    const size = PackManager.WINDOW_SIZE;
+    const serverPage = Math.floor(globalStart / size) + 1;
+    let items = await this.fetchPackList(serverPage, size);
+    if (items.length === 0) {
+      // пустой ответ может быть анти-рейтлимитом, а не концом каталога — один повтор
+      await new Promise((res) => setTimeout(res, 1500));
+      items = await this.fetchPackList(serverPage, size);
+    }
+    this.windowItems = items;
+    this.windowStart = (serverPage - 1) * size;
+    this.windowEnd = this.windowStart + items.length;
+    if (items.length < size) {
+      this.catalogEnd = this.windowEnd;
+    }
+  }
+  async getUiPage(uiPage, uiPerPage = 20) {
+    const start = (uiPage - 1) * uiPerPage;
+    const end = start + uiPerPage;
+    if (this.catalogEnd !== null && start >= this.catalogEnd) {
+      return [];
+    }
+    if (start < this.windowStart || end > this.windowEnd) {
+      await this.fetchWindow(start);
+    }
+    const from = start - this.windowStart;
+    return this.windowItems.slice(from, from + uiPerPage);
+  }
   async fetchPackList(page = 1, perPage = 50) {
     const url = `${GDMOD_BASE}/tracks/?onpage=${perPage}&page=${page}`;
     const resp = await this.fetchWithProxy(url);

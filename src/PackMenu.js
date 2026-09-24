@@ -83,7 +83,7 @@ class PackMenu {
     this.statusMessage = "Loading...";
     this.rebuildPackListMenu();
     try {
-      this.packList = await this.packManager.fetchPackList(this.currentPage);
+      this.packList = await this.packManager.getUiPage(this.currentPage, 20);
       try {
         const cachedIds = new Set((await this.packManager.getCachedPacks()).map((m) => m.id));
         this.packList = this.packList.filter((p) => !cachedIds.has(p.id));
@@ -190,7 +190,16 @@ class PackMenu {
   }
   goToNextPage() {
     this.currentPage++;
-    void this.loadPackListPage();
+    void this.loadPackListPage().then(() => {
+      const pm = this.packManager;
+      const start = (this.currentPage - 1) * 20;
+      if (this.currentPage > 1 && pm.catalogEnd !== null && start >= pm.catalogEnd) {
+        this.currentPage--;
+        void this.loadPackListPage().then(() => {
+          this.statusMessage = "No more packs";
+        });
+      }
+    });
   }
   async onPackSelected(pack) {
     this.showPackDetail(pack);
