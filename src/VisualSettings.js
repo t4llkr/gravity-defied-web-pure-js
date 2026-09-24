@@ -3,10 +3,10 @@ export class VisualSettings {
   static settings = {
     lineColor: "#00aa00",
     bgColor: "#ffffff",
-    fillEnabled: true,
+    fillEnabled: false,
     fillColor: "#008800",
     fillMode: "gradient",
-    curtainEnabled: true,
+    curtainEnabled: false,
     bgImageMode: "fill",
     showBgImage: true
   };
