@@ -498,6 +498,9 @@ class GamePhysics {
         }
         if (var52 === 0) {
           var4 = var3 + var4 >> 1;
+          if (((var4 - var3) >= 0 ? var4 - var3 : -(var4 - var3)) < 65) {
+            return 5;
+          }
           continue;
         }
         if (var52 === 3) {
