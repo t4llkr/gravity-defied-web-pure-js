@@ -40,6 +40,28 @@ class PackMenu {
     this.gameMenuPacks.addMenuElement(this.taskBack);
     this.originalLoader = this.micro.levelLoader;
   }
+  async restoreLastPack() {
+    let packId = 0;
+    try {
+      packId = parseInt(window.localStorage.getItem("gd-last-pack") || "0", 10) || 0;
+    } catch {
+    }
+    if (packId === 0) {
+      return;
+    }
+    try {
+      const blobUrl = await this.packManager.getPackBlobUrl(packId);
+      const loader = await LevelLoader.create(blobUrl);
+      this.applyLoader(loader, packId);
+    } catch {
+      // пак есть в памяти, но бинарника нет (кэш очищен/повреждён) — откат на оригинал
+      try {
+        window.localStorage.setItem("gd-last-pack", "0");
+      } catch {
+      }
+      this.menuManager.showAlert("Pack not found", "The saved pack is missing from the cache. Original levels loaded.", null);
+    }
+  }
   applyLoader(loader, packId) {
     this.micro.levelLoader = loader;
     if (this.micro.gamePhysics !== null) {

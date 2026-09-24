@@ -502,6 +502,9 @@ class MenuManager {
         this.settingsStringTrack.setCurrentOptionPos(0);
         this.settingsStringTrack.setAvailableOptions(this.unlockedTracksByLevel[this.settingStringLevel.getCurrentOptionPos()]);
       }
+      this.availableLeagues = this.settingsStringLeague.getMaxAvailableOptionPos();
+      this.maxAvailableLevel = this.settingStringLevel.getMaxAvailableOptionPos();
+      this.saveProgressToStorage();
       if (availableLeagues !== -1) {
         this.addTextRender(this.gameMenuFinished, `Congratultions! You have successfully unlocked a new league: ${this.leagueNames[availableLeagues]}`);
         if (availableLeagues === 3) {
@@ -921,6 +924,7 @@ class MenuManager {
       if (this.settingStringLevel !== null) {
         this.selectedTrackByLevel[this.settingStringLevel.getCurrentOptionPos()] = this.settingsStringTrack.getCurrentOptionPos();
       }
+      this.saveProgressToStorage();
       return;
     }
     if (menuElement === this.settingStringLevel) {
@@ -935,13 +939,17 @@ class MenuManager {
         this.settingsStringTrack.setCurrentOptionPos(this.selectedTrackByLevel[this.settingStringLevel.getCurrentOptionPos()]);
         this.settingsStringTrack.init();
       }
+      this.saveProgressToStorage();
       return;
     }
-    if (menuElement === this.settingsStringLeague && this.settingsStringLeague.consumeSelectionMenuRequested()) {
-      this.gameMenuLeague = this.settingsStringLeague.getCurrentMenu();
-      this.settingsStringLeague.setParentGameMenu(this.currentGameMenu);
-      this.openMenu(this.gameMenuLeague, false);
-      this.gameMenuLeague?.scrollToSelection(this.settingsStringLeague.getCurrentOptionPos());
+    if (menuElement === this.settingsStringLeague) {
+      if (this.settingsStringLeague.consumeSelectionMenuRequested()) {
+        this.gameMenuLeague = this.settingsStringLeague.getCurrentMenu();
+        this.settingsStringLeague.setParentGameMenu(this.currentGameMenu);
+        this.openMenu(this.gameMenuLeague, false);
+        this.gameMenuLeague?.scrollToSelection(this.settingsStringLeague.getCurrentOptionPos());
+      }
+      this.saveProgressToStorage();
     }
     if (menuElement === this.taskLevelPacks) {
       // обычный пункт с подменю: parent/открытие корректно делает menuElemMethod
@@ -1100,6 +1108,10 @@ class MenuManager {
       this.saveProgressToStorage(false);
     }
     this.currentPackId = packId;
+    try {
+      window.localStorage.setItem("gd-last-pack", String(packId));
+    } catch {
+    }
     const data = this.loadProgressData(packId);
     if (data !== null) {
       this.availableLeagues = data.al;
@@ -1109,7 +1121,7 @@ class MenuManager {
       this.unlockedTracksByLevel[2] = data.u[2];
     } else {
       this.availableLeagues = 0;
-      this.maxAvailableLevel = 1;
+      this.maxAvailableLevel = 0;
       this.unlockedTracksByLevel[0] = 0;
       this.unlockedTracksByLevel[1] = 0;
       this.unlockedTracksByLevel[2] = -1;
@@ -1129,7 +1141,7 @@ class MenuManager {
     }
     if (data !== null && Array.isArray(data.sel) && data.sel.length >= 3) {
       this.settingsStringLeague?.setCurrentOptionPos(Math.min(data.sel[2], this.availableLeagues));
-      this.settingStringLevel?.setCurrentOptionPos(Math.min(data.sel[0], Math.max(0, this.maxAvailableLevel - 1)));
+      this.settingStringLevel?.setCurrentOptionPos(Math.min(data.sel[0], this.maxAvailableLevel));
       this.settingsStringTrack?.setCurrentOptionPos(data.sel[1]);
     } else {
       // сохранённого выбора нет — начинаем пак с первой позиции

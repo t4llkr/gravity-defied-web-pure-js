@@ -39,6 +39,7 @@ async function startGravityDefiedApp(root) {
   };
   gamePhysics.applyLoadedSpriteFlags(state.loadedSpriteFlags);
   menuManager.applyLoadedSpriteFlags(state.loadedSpriteFlags);
+  await menuManager.packMenu?.restoreLastPack();
   gamePhysics.setMode(1);
   function resize() {
     const rect = root.getBoundingClientRect();
