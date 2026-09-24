@@ -1,3 +1,4 @@
+import { VisualSettings, pickColor, pickFile, saveBgImage } from "./VisualSettings.js";
 import { GameCanvas } from "./GameCanvas.js";
 import { GameMenu } from "./GameMenu.js";
 import { LevelLoader } from "./LevelLoader.js";
@@ -253,6 +254,7 @@ class MenuManager {
         this.gameMenuOptions = new GameMenu("Options", this.micro, this.gameMenuMain);
         this.gameMenuAbout = new GameMenu("About", this.micro, this.gameMenuMain);
         this.gameMenuHelp = new GameMenu("Help", this.micro, this.gameMenuMain);
+        this.gameMenuVisuals = new GameMenu("Visuals", this.micro, this.gameMenuMain);
         this.settingStringBack = new SettingsStringRender("Back", 0, this, [], false, this.micro, this.gameMenuMain, true);
         this.settingStringGoToMain = new SettingsStringRender("Go to Main", 0, this, [], false, this.micro, this.gameMenuMain, true);
         this.settingStringContinue = new SettingsStringRender("Continue", 0, this, [], false, this.micro, this.gameMenuMain, true);
@@ -282,11 +284,32 @@ class MenuManager {
         void packManager.init();
         this.packMenu = new PackMenu(this.micro, this, packManager);
         this.taskLevelPacks = new TimerOrMotoPartOrMenuElem("Level Packs", this.packMenu.getMainMenu(), this);
+        this.taskLineColor = new TimerOrMotoPartOrMenuElem("Line color", null, this);
+        this.taskBgColor = new TimerOrMotoPartOrMenuElem("Background color", null, this);
+        this.fillSetting = new SettingsStringRender("Track fill", VisualSettings.settings.fillEnabled ? 0 : 1, this, this.toggleOptionNames, true, this.micro, this.gameMenuVisuals, false);
+        this.taskFillColor = new TimerOrMotoPartOrMenuElem("Fill color", null, this);
+        this.fillModeSetting = new SettingsStringRender("Shading", VisualSettings.settings.fillMode === "gradient" ? 0 : 1, this, ["Smooth", "Steps"], true, this.micro, this.gameMenuVisuals, false);
+        this.curtainSetting = new SettingsStringRender("Track curtain", VisualSettings.settings.curtainEnabled ? 0 : 1, this, this.toggleOptionNames, true, this.micro, this.gameMenuVisuals, false);
+        this.taskBgImage = new TimerOrMotoPartOrMenuElem("BG image", null, this);
+        this.bgModeSetting = new SettingsStringRender("BG mode", VisualSettings.settings.bgImageMode === "fill" ? 0 : VisualSettings.settings.bgImageMode === "fit" ? 1 : 2, this, ["Fill", "Fit", "Tile"], false, this.micro, this.gameMenuVisuals, false);
+        this.showBgSetting = new SettingsStringRender("Show image", VisualSettings.settings.showBgImage ? 0 : 1, this, this.toggleOptionNames, true, this.micro, this.gameMenuVisuals, false);
+        this.gameMenuVisuals?.addMenuElement(this.taskLineColor);
+        this.gameMenuVisuals?.addMenuElement(this.taskBgColor);
+        this.gameMenuVisuals?.addMenuElement(this.fillSetting);
+        this.gameMenuVisuals?.addMenuElement(this.taskFillColor);
+        this.gameMenuVisuals?.addMenuElement(this.fillModeSetting);
+        this.gameMenuVisuals?.addMenuElement(this.curtainSetting);
+        this.gameMenuVisuals?.addMenuElement(this.taskBgImage);
+        this.gameMenuVisuals?.addMenuElement(this.bgModeSetting);
+        this.gameMenuVisuals?.addMenuElement(this.showBgSetting);
+        this.gameMenuVisuals?.addMenuElement(this.settingStringBack);
+        this.taskVisuals = new TimerOrMotoPartOrMenuElem("Visuals", this.gameMenuVisuals, this);
         this.gameMenuMain?.addMenuElement(this.taskPlayMenu);
         this.gameMenuMain?.addMenuElement(this.taskOptions);
         this.gameMenuMain?.addMenuElement(this.taskHelp);
         this.gameMenuMain?.addMenuElement(this.taskAbout);
         this.gameMenuMain?.addMenuElement(this.taskLevelPacks);
+        this.gameMenuMain?.addMenuElement(this.taskVisuals);
         this.gameMenuMain?.addMenuElement(this.settingStringExitGame);
         this.settingStringLevel = new SettingsStringRender("Level", this.selectedLevelIndex, this, this.levelDifficultyNames, false, this.micro, this.gameMenuPlay, false);
         this.settingsStringTrack = new SettingsStringRender("Track", this.selectedTrackByLevel[this.selectedLevelIndex], this, this.levelNames[this.selectedLevelIndex], false, this.micro, this.gameMenuPlay, false);
@@ -679,6 +702,9 @@ class MenuManager {
     return this.currentGameMenu;
   }
   openMenu(gm, preserveSelection) {
+    if (gm === null || gm === undefined) {
+      return;
+    }
     this.micro.gameCanvas?.hideBackButton();
     if (gm !== this.gameMenuMain && gm !== this.gameMenuFinished && gm !== null) {
       this.micro.gameCanvas?.showBackButton();
@@ -950,6 +976,62 @@ class MenuManager {
         this.gameMenuLeague?.scrollToSelection(this.settingsStringLeague.getCurrentOptionPos());
       }
       this.saveProgressToStorage();
+    }
+    if (menuElement === this.taskLineColor) {
+      pickColor(VisualSettings.settings.lineColor, (hex) => {
+        VisualSettings.settings.lineColor = hex;
+      });
+      return;
+    }
+    if (menuElement === this.fillSetting) {
+      VisualSettings.settings.fillEnabled = this.fillSetting.getCurrentOptionPos() === 0;
+      VisualSettings.save();
+      return;
+    }
+    if (menuElement === this.fillModeSetting) {
+      VisualSettings.settings.fillMode = this.fillModeSetting.getCurrentOptionPos() === 0 ? "gradient" : "steps";
+      VisualSettings.save();
+      return;
+    }
+    if (menuElement === this.taskBgImage) {
+      pickFile(async (file) => {
+        try {
+          await saveBgImage(file);
+          await VisualSettings.loadBgImageFromStorage();
+          VisualSettings.save();
+        } catch {
+          this.showAlert("BG image", "Failed to load the image.", null);
+        }
+      });
+      return;
+    }
+    if (menuElement === this.bgModeSetting) {
+      const pos = this.bgModeSetting.getCurrentOptionPos();
+      VisualSettings.settings.bgImageMode = pos === 0 ? "fill" : pos === 1 ? "fit" : "tile";
+      VisualSettings.save();
+      return;
+    }
+    if (menuElement === this.showBgSetting) {
+      VisualSettings.settings.showBgImage = this.showBgSetting.getCurrentOptionPos() === 0;
+      VisualSettings.save();
+      return;
+    }
+    if (menuElement === this.curtainSetting) {
+      VisualSettings.settings.curtainEnabled = this.curtainSetting.getCurrentOptionPos() === 0;
+      VisualSettings.save();
+      return;
+    }
+    if (menuElement === this.taskFillColor) {
+      pickColor(VisualSettings.settings.fillColor, (hex) => {
+        VisualSettings.settings.fillColor = hex;
+      });
+      return;
+    }
+    if (menuElement === this.taskBgColor) {
+      pickColor(VisualSettings.settings.bgColor, (hex) => {
+        VisualSettings.settings.bgColor = hex;
+      });
+      return;
     }
     if (menuElement === this.taskLevelPacks) {
       // обычный пункт с подменю: parent/открытие корректно делает menuElemMethod

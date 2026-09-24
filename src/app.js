@@ -3,8 +3,11 @@ import { GamePhysics } from "./GamePhysics.js";
 import { LevelLoader } from "./LevelLoader.js";
 import { MenuManager } from "./MenuManager.js";
 import { Micro } from "./Micro.js";
+import { VisualSettings } from "./VisualSettings.js";
 const LEVELS_MRG_URL = new URL("./assets/levels.mrg", import.meta.url).href
 async function startGravityDefiedApp(root) {
+  VisualSettings.load();
+  void VisualSettings.loadBgImageFromStorage();
   root.className = "app-root";
   const canvasElement = document.createElement("canvas");
   canvasElement.className = "game-canvas";

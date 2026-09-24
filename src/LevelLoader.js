@@ -1,3 +1,4 @@
+import { VisualSettings } from "./VisualSettings.js";
 import { INT_MAX, INT_MIN, abs, divideF16, multiplyF16 } from "./cpp.js";
 import { GameLevel } from "./GameLevel.js";
 import { GamePhysics } from "./GamePhysics.js";
@@ -164,7 +165,7 @@ class LevelLoader {
     if (this.gameLevel === null) {
       return;
     }
-    gameCanvas.setColor(0, 170, 0);
+    gameCanvas.setColor(...VisualSettings.lineRGB());
     xF16 >>= 1;
     yF16 >>= 1;
     this.gameLevel.renderLevel3D(gameCanvas, xF16, yF16);
@@ -173,7 +174,7 @@ class LevelLoader {
     if (this.gameLevel === null) {
       return;
     }
-    canvas.setColor(0, 255, 0);
+    canvas.setColor(...VisualSettings.lineRGB());
     this.gameLevel.renderTrackNearestGreenLine(canvas);
   }
   updateVisiblePointRange(var1, var2, var3) {

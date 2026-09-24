@@ -430,15 +430,8 @@ class GameCanvas {
     this.graphics.setClip(0, 0, this.width, this.getHeight());
   }
   clearScreenWithWhite() {
-    let img = VisualSettings.settings.showBgImage ? VisualSettings.bgImage : null;
-    let gifFrame = null;
-    if (img === null && VisualSettings.settings.showBgImage) {
-      gifFrame = VisualSettings.currentGifFrame();
-      if (gifFrame !== null) {
-        img = gifFrame;
-      }
-    }
-    if (img !== null && (gifFrame !== null || img.complete && img.naturalWidth > 0)) {
+    const img = VisualSettings.settings.showBgImage ? VisualSettings.bgImage : null;
+    if (img !== null && img.complete && img.naturalWidth > 0) {
       this.graphics.withClip(() => {
         const ctx = this.graphics.ctx;
         const w = this.width;
@@ -460,11 +453,9 @@ class GameCanvas {
           }
         } else {
           if (mode === "fit") {
-            const iw = img.naturalWidth > 0 ? img.naturalWidth : img.width;
-            const ih = img.naturalHeight > 0 ? img.naturalHeight : img.height;
-            const scale = Math.min(w / iw, h / ih);
-            const dw = iw * scale;
-            const dh = ih * scale;
+            const scale = Math.min(w / img.naturalWidth, h / img.naturalHeight);
+            const dw = img.naturalWidth * scale;
+            const dh = img.naturalHeight * scale;
             ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
           } else {
             ctx.drawImage(img, 0, 0, w, h);
