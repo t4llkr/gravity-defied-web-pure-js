@@ -39,6 +39,7 @@ class PackMenu {
     this.gameMenuPacks.addMenuElement(this.taskCachedPacks);
     this.gameMenuPacks.addMenuElement(this.taskBack);
     this.originalLoader = this.micro.levelLoader;
+    this.lastRawCount = -1;
   }
   async restoreLastPack() {
     let packId = 0;
@@ -83,6 +84,8 @@ class PackMenu {
     this.statusMessage = "Loading...";
     this.rebuildPackListMenu();
     try {
+      // Оконная схема: с сервера — по 200 паков за запрос, на UI-странице — по 20.
+      // GDLVL-only строки считаются в окне, но скрываются фильтром hasMrg.
       this.packList = await this.packManager.getUiPage(this.currentPage, 20);
       try {
         const cachedIds = new Set((await this.packManager.getCachedPacks()).map((m) => m.id));
@@ -124,8 +127,15 @@ class PackMenu {
       const prevItem = new PrevPageItem(this);
       this.gameMenuPackList.addMenuElement(prevItem);
     }
-    const nextItem = new NextPageItem(this);
-    this.gameMenuPackList.addMenuElement(nextItem);
+    // Next скрываем, только когда окно подтвержденно короткое (конец каталога)
+    // и текущая страница — последняя в этом окне
+    const pm = this.packManager;
+    const rawTotal = pm.windowStart + pm.windowItems.length;
+    const lastUiPage = Math.max(1, Math.ceil(rawTotal / 20));
+    if (!pm.shortConfirmed || this.currentPage < lastUiPage) {
+      const nextItem = new NextPageItem(this);
+      this.gameMenuPackList.addMenuElement(nextItem);
+    }
     const back = new BackItem("Back", this.gameMenuPacks, this.menuManager);
     this.gameMenuPackList.addMenuElement(back);
   }
@@ -189,17 +199,10 @@ class PackMenu {
     }
   }
   goToNextPage() {
-    const pm = this.packManager;
-    // упреждающая блокировка: конец каталога известен — не инкрементируем и не дёргаем сеть
-    const nextStart = this.currentPage * 20;
-    if (pm.catalogEnd !== null && nextStart >= pm.catalogEnd) {
-      this.statusMessage = "No more packs";
-      return;
-    }
     this.currentPage++;
     void this.loadPackListPage().then(() => {
-      const start = (this.currentPage - 1) * 20;
-      if (this.currentPage > 1 && pm.catalogEnd !== null && start >= pm.catalogEnd) {
+      // пустая страница (после фильтра) = конец каталога: откатываемся и фиксируем
+      if (this.packList.length === 0 && this.currentPage > 1) {
         this.currentPage--;
         void this.loadPackListPage().then(() => {
           this.statusMessage = "No more packs";

@@ -306,11 +306,13 @@ class MenuManager {
         this.gameMenuVisuals?.addMenuElement(this.showBgSetting);
         this.gameMenuVisuals?.addMenuElement(this.settingStringBack);
         this.taskVisuals = new TimerOrMotoPartOrMenuElem("Visuals", this.gameMenuVisuals, this);
+        this.taskSkins = new TimerOrMotoPartOrMenuElem("Skins", null, this);
         this.gameMenuMain?.addMenuElement(this.taskPlayMenu);
         this.gameMenuMain?.addMenuElement(this.taskOptions);
         this.gameMenuMain?.addMenuElement(this.taskHelp);
         this.gameMenuMain?.addMenuElement(this.taskLevelPacks);
         this.gameMenuMain?.addMenuElement(this.taskVisuals);
+        this.gameMenuMain?.addMenuElement(this.taskSkins);
         this.gameMenuMain?.addMenuElement(this.taskAbout);
         this.gameMenuMain?.addMenuElement(this.settingStringExitGame);
         this.settingStringLevel = new SettingsStringRender("Level", this.selectedLevelIndex, this, this.levelDifficultyNames, false, this.micro, this.gameMenuPlay, false);
@@ -978,6 +980,10 @@ class MenuManager {
         this.gameMenuLeague?.scrollToSelection(this.settingsStringLeague.getCurrentOptionPos());
       }
       this.saveProgressToStorage();
+    }
+    if (menuElement === this.taskSkins) {
+      this.skinGalleryOpener?.();
+      return;
     }
     if (menuElement === this.taskLineColor) {
       pickColor(VisualSettings.settings.lineColor, (hex) => {

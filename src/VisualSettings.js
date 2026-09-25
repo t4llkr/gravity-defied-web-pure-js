@@ -204,9 +204,15 @@ export function pickColor(initial, onChange) {
 // === Хранилище фона-изображения (IndexedDB) ===
 function bgImageDb() {
   return new Promise((resolve, reject) => {
-    const rq = indexedDB.open("gdvisual", 1);
+    const rq = indexedDB.open("gdvisual", 2);
     rq.onupgradeneeded = () => {
-      rq.result.createObjectStore("kv");
+      const db = rq.result;
+      if (!db.objectStoreNames.contains("kv")) {
+        db.createObjectStore("kv");
+      }
+      if (!db.objectStoreNames.contains("skins")) {
+        db.createObjectStore("skins", { keyPath: "id" });
+      }
     };
     rq.onsuccess = () => resolve(rq.result);
     rq.onerror = () => reject(rq.error);

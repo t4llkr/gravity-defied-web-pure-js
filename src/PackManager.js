@@ -94,34 +94,76 @@ class PackManager {
   windowStart = 0;
   windowEnd = 0;
   catalogEnd = null;
+  confirmedShortPages = new Set();
   static WINDOW_SIZE = 200;
   async fetchWindow(globalStart) {
     const size = PackManager.WINDOW_SIZE;
-    const serverPage = Math.floor(globalStart / size) + 1;
-    let items = await this.fetchPackList(serverPage, size);
-    if (items.length === 0) {
-      // пустой ответ может быть анти-рейтлимитом, а не концом каталога — один повтор
-      await new Promise((res) => setTimeout(res, 1500));
-      items = await this.fetchPackList(serverPage, size);
+    // нумерация страниц gdmod.ru НАЧИНАЕТСЯ С НУЛЯ: ?page=0 — первая страница
+    const serverPage = Math.floor(globalStart / size);
+    // gdmod.ru иногда отдаёт усечённую страницу; частичное окно подтверждаем
+    // одним повтором и запоминаем — повторно сеть не дёргаем
+    this.shortConfirmed = false;
+    let items = [];
+    let maxAttempts = this.confirmedShortPages.has(serverPage) ? 1 : 3;
+    for (let attempt = 0; attempt < maxAttempts; ++attempt) {
+      if (attempt > 0) {
+        await new Promise((res) => setTimeout(res, 600));
+      }
+      const got = await this.fetchPackList(serverPage, size);
+      if (got.length > items.length) {
+        items = got;
+      }
+      if (items.length >= size) {
+        break;
+      }
+      if (items.length > 0) {
+        maxAttempts = Math.min(maxAttempts, 2);
+        this.shortConfirmed = true;
+        this.confirmedShortPages.add(serverPage);
+      }
     }
     this.windowItems = items;
-    this.windowStart = (serverPage - 1) * size;
+    this.windowStart = serverPage * size;
     this.windowEnd = this.windowStart + items.length;
-    if (items.length < size) {
-      this.catalogEnd = this.windowEnd;
-    }
+    // ВАЖНО: не фиксируем «конец каталога» по короткому окну — gdmod периодически
+    // отдаёт усечённые страницы; конец определяет PackMenu по пустой странице
   }
   async getUiPage(uiPage, uiPerPage = 20) {
     const start = (uiPage - 1) * uiPerPage;
     const end = start + uiPerPage;
-    if (this.catalogEnd !== null && start >= this.catalogEnd) {
-      return [];
-    }
     if (start < this.windowStart || end > this.windowEnd) {
       await this.fetchWindow(start);
     }
     const from = start - this.windowStart;
-    return this.windowItems.slice(from, from + uiPerPage);
+    // GDLVL-only паки (без MRG) не скачать/не играть — не показываем в Browse
+    return this.windowItems.slice(from, from + uiPerPage).filter((p) => p.hasMrg);
+  }
+  // Простая постраничная загрузка (0-based): одна UI-страница = один запрос.
+  // При усечённом ответе — до 3 попыток, берём максимум.
+  async fetchPage(zeroBasedPage, perPage = 50) {
+    let items = [];
+    let maxAttempts = 3;
+    for (let attempt = 0; attempt < maxAttempts; ++attempt) {
+      if (attempt > 0) {
+        await new Promise((res) => setTimeout(res, 600));
+      }
+      try {
+        const got = await this.fetchPackList(zeroBasedPage, perPage);
+        if (got.length > items.length) {
+          items = got;
+        }
+        if (items.length >= perPage) {
+          break;
+        }
+        // частичная страница (0 < n < perPage) — типичный конец каталога:
+        // одного подтверждения достаточно; пустой ответ — до 3 попыток
+        if (items.length > 0) {
+          maxAttempts = Math.min(maxAttempts, 2);
+        }
+      } catch {
+      }
+    }
+    return items;
   }
   async fetchPackList(page = 1, perPage = 50) {
     const url = `${GDMOD_BASE}/tracks/?onpage=${perPage}&page=${page}`;
@@ -141,13 +183,16 @@ class PackManager {
       const mrgSizeMatch = row.match(/MRG\s*<\/a>\s*<span class='size'>(.*?)<\/span>/);
       const gdlvlMatch = row.match(/href='(\/\?get=gdlvl&id=\d+)'/);
       const gdlvlSizeMatch = row.match(/GDLVL\s*<\/a>\s*<span class='size'>(.*?)<\/span>/);
-      if (idMatch && levelsMatch && authorMatch) {
+      if (idMatch) {
+        // levels/MRG/author могут отсутствовать у GDLVL-only паков — они неиграбельны
+        // для нас, но должны СЧИТАТЬСЯ в окне, иначе пагинация обрывается раньше времени
         tracks.push({
           id: parseInt(idMatch[1], 10),
           name: this.unescapeHtml(idMatch[2].trim()),
-          author: this.unescapeHtml(authorMatch[2].trim()),
-          authorId: parseInt(authorMatch[1], 10),
-          levels: levelsMatch[1].trim(),
+          author: authorMatch ? this.unescapeHtml(authorMatch[2].trim()) : "",
+          authorId: authorMatch ? parseInt(authorMatch[1], 10) : 0,
+          levels: levelsMatch?.[1]?.trim() ?? "",
+          hasMrg: mrgSizeMatch !== null,
           mrgSize: mrgSizeMatch?.[1]?.trim() ?? "",
           gdlvlSize: gdlvlSizeMatch?.[1]?.trim(),
           hasGdlvl: !!gdlvlMatch

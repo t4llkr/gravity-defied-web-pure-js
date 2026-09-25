@@ -4,6 +4,9 @@ import { LevelLoader } from "./LevelLoader.js";
 import { MenuManager } from "./MenuManager.js";
 import { Micro } from "./Micro.js";
 import { VisualSettings } from "./VisualSettings.js";
+import { SkinCatalog } from "./SkinCatalog.js";
+import { SkinManager } from "./SkinManager.js";
+import { openSkinGallery } from "./SkinGallery.js";
 const LEVELS_MRG_URL = new URL("./assets/levels.mrg", import.meta.url).href
 async function startGravityDefiedApp(root) {
   VisualSettings.load();
@@ -40,9 +43,15 @@ async function startGravityDefiedApp(root) {
     forcedRestartMs: 0,
     wasInGameMenu: false
   };
+  gameCanvas.loadedSpriteFlags = state.loadedSpriteFlags;
   gamePhysics.applyLoadedSpriteFlags(state.loadedSpriteFlags);
   menuManager.applyLoadedSpriteFlags(state.loadedSpriteFlags);
   await menuManager.packMenu?.restoreLastPack();
+  const skinCatalog = new SkinCatalog(menuManager.packMenu.packManager);
+  const skinManager = new SkinManager(menuManager.packMenu.packManager, gameCanvas);
+  menuManager.skinGalleryOpener = () => openSkinGallery(skinManager, skinCatalog);
+  await skinManager.restoreOnBoot();
+  window.__gd.skinManager = skinManager;
   gamePhysics.setMode(1);
   function resize() {
     const rect = root.getBoundingClientRect();

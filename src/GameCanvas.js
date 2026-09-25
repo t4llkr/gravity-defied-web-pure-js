@@ -136,6 +136,17 @@ class GameCanvas {
     this.dy = this.height2;
     GameCanvas.defaultFontWidth00 = 25;
   }
+  // Повторная привязка спрайтов после замены assetCaches (смена скина):
+  // зеркало присваиваний конструктора + пересборка производных спрайтов.
+  rebindSpriteImages() {
+    this.helmetImage = this.assetCaches.helmetImage;
+    this.spritesImage = this.assetCaches.spritesImage;
+    this.helmetSpriteWidth = this.helmetImage.getWidth() / 6;
+    this.helmetSpriteHeight = this.helmetImage.getHeight() / 6;
+    if (this.loadedSpriteFlags !== null && this.loadedSpriteFlags !== undefined) {
+      void this.loadSprites(this.loadedSpriteFlags);
+    }
+  }
   resize(width, height) {
     this.canvas.width = width;
     this.canvas.height = height;
