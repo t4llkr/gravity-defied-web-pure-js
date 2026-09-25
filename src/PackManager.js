@@ -135,8 +135,10 @@ class PackManager {
       await this.fetchWindow(start);
     }
     const from = start - this.windowStart;
+    const slice = this.windowItems.slice(from, from + uiPerPage);
+    this.lastSliceRawCount = slice.length;
     // GDLVL-only паки (без MRG) не скачать/не играть — не показываем в Browse
-    return this.windowItems.slice(from, from + uiPerPage).filter((p) => p.hasMrg);
+    return slice.filter((p) => p.hasMrg);
   }
   // Простая постраничная загрузка (0-based): одна UI-страница = один запрос.
   // При усечённом ответе — до 3 попыток, берём максимум.
@@ -278,7 +280,9 @@ class PackManager {
       "&mdash;": "\u2014",
       "&ndash;": "\u2013"
     };
-    return text.replace(/&(?:amp|lt|gt|quot|#039|mdash|ndash);/g, (m) => map[m] ?? m);
+    return text
+      .replace(/&(?:amp|lt|gt|quot|#039|mdash|ndash);/g, (m) => map[m] ?? m)
+      .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)));
   }
 }
 export {

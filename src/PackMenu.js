@@ -227,6 +227,11 @@ class PackMenu {
   async downloadAndLoadPack(pack) {
     try {
       await this.packManager.downloadPack(pack.id);
+      // name/author из пункта каталога надёжнее детальной страницы — сохраняем в мету
+      void this.packManager.cache.updatePackMeta(pack.id, {
+        name: pack.name,
+        author: pack.author
+      });
       const blobUrl = await this.packManager.getPackBlobUrl(pack.id);
       if (!blobUrl) {
         this.menuManager.showAlert("Error", "Failed to load pack", null);
@@ -236,7 +241,8 @@ class PackMenu {
       const tracksTotal = newLoader.levelNames.reduce((acc, lvl) => acc + lvl.length, 0);
       void this.packManager.cache.updatePackMeta(pack.id, {
         tracksTotal,
-        leaguesTotal: newLoader.levelNames.length
+        leaguesTotal: newLoader.levelNames.length,
+        levelsBreakdown: newLoader.levelNames.map((l) => l.length)
       });
       this.applyLoader(newLoader, pack.id);
       this.menuManager.showAlert("Pack Loaded", `${pack.name} ready!`, null);
