@@ -283,7 +283,7 @@ class MenuManager {
         const packManager = new PackManager();
         void packManager.init();
         this.packMenu = new PackMenu(this.micro, this, packManager);
-        this.taskLevelPacks = new TimerOrMotoPartOrMenuElem("Level Packs", this.packMenu.getMainMenu(), this);
+        this.taskLevelPacks = new TimerOrMotoPartOrMenuElem("Level Packs", null, this);
         this.taskLineColor = new TimerOrMotoPartOrMenuElem("Line color", null, this);
         this.taskBgColor = new TimerOrMotoPartOrMenuElem("Background color", null, this);
         this.taskTextColor = new TimerOrMotoPartOrMenuElem("Text color", null, this);
@@ -1048,7 +1048,8 @@ class MenuManager {
       return;
     }
     if (menuElement === this.taskLevelPacks) {
-      // обычный пункт с подменю: parent/открытие корректно делает menuElemMethod
+      // открываем DOM-галерею паков (аналог скинов), а не подменю на канвасе
+      this.packGalleryOpener?.();
       return;
     }
     if (menuElement === this.packMenu?.taskBrowsePacks) {
