@@ -63,7 +63,7 @@ Clearing site data wipes all progress, records and downloaded content.
 
 ## Changes from upstream
 
-Port date: 2026-09-23 → 2026-09-25; all 32 `.ts` modules transpiled to native ES modules. Highlights, in general terms:
+Port date: 2026-09-23 → 2026-10-02; all 32 `.ts` modules transpiled to native ES modules. Highlights, in general terms:
 
 - **Runtime**: no bundler and no Node.js — native ES modules, Vite-isms replaced with standard web APIs, plus a zero-dependency Python static server (`server.py`).
 - **Stability**: fixed a startup hang (background raster drawn before load) and an infinite loop in the physics bisection (a bike falling out of the map froze the tab) by restoring the original algorithm's termination guard; settings/progress now flush on tab close.
