@@ -1,6 +1,7 @@
-// Управление скинами: скачивание ZIP с gdmod.ru, распаковка, применение,
+// Управление скинами: локальный ZIP из data/skins.zip, распаковка, применение,
 // хранение в IndexedDB, восстановление при старте, сброс на дефолт.
 import { unzip } from "./ZipReader.js";
+import { fetchSkinFile } from "./LocalFiles.js";
 import { Image as LcduiImage } from "./lcdui/Image.js";
 import { saveSkin, getSkin, getAllSkins } from "./SkinStore.js";
 
@@ -42,13 +43,10 @@ export class SkinManager {
     }
     this.gameCanvas.rebindSpriteImages();
   }
-  // скачать скин с gdmod.ru, сохранить в кэш и применить
+  // взять скин из локального архива, сохранить в кэш и применить
   async downloadAndApply(item) {
-    const resp = await this.packManager.fetchWithProxy(`https://gdmod.ru/?get=skins.zip&id=${item.id}`);
-    const zipBlob = await resp.blob();
+    const zipBlob = await fetchSkinFile(item.id);
     const images = await this.imagesFromZipBlob(zipBlob);
-    // миниатюру храним как URL: <img> показывает её с gdmod.ru без CORS,
-    // а fetch-байты были бы заблокированы (fetch не освобождается от CORS)
     await saveSkin({ id: item.id, name: item.name, author: item.author, zipBlob, thumbUrl: item.thumbUrl, savedAt: Date.now() });
     this.applyImages(images);
     this.setCurrent(item.id);
@@ -101,7 +99,9 @@ export class SkinManager {
   }
   async savedSkins() {
     try {
-      return await getAllSkins();
+      const all = await getAllSkins();
+      // tombstone-записи (deleted:true) — следствие fallback-удаления, прячем
+      return Array.isArray(all) ? all.filter((r) => r && !r.deleted) : [];
     } catch {
       return [];
     }

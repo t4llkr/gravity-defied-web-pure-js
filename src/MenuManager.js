@@ -705,9 +705,49 @@ class MenuManager {
   getCurrentMenu() {
     return this.currentGameMenu;
   }
+  // Динамический состав Visuals: опциональные пункты показываются только когда
+  // актуальны (заливка — при включённом Track fill; BG mode/Show image — при
+  // загруженном фоновом изображении). Инстансы элементов не пересоздаём —
+  // пересобираем только вектор; вызывается при каждом открытии меню.
+  rebuildVisualsMenu() {
+    if (this.gameMenuVisuals === null || this.gameMenuVisuals === undefined) {
+      return;
+    }
+    const menu = this.gameMenuVisuals;
+    // запоминаем ПОЗИЦИЮ курсора по элементу (не по индексу) — после пересборки
+    // ищем тот же инстанс; если элемент исчез, зажимаем индекс в диапазон
+    const prevIdx = menu.getSelectedIndex();
+    const prevEl = prevIdx >= 0 && prevIdx < menu.vector.length ? menu.vector[prevIdx] : null;
+    menu.clearVector();
+    menu.addMenuElement(this.taskLineColor);
+    menu.addMenuElement(this.taskTextColor);
+    menu.addMenuElement(this.taskBgColor);
+    menu.addMenuElement(this.fillSetting);
+    if (VisualSettings.settings.fillEnabled) {
+      menu.addMenuElement(this.taskFillColor);
+      menu.addMenuElement(this.fillModeSetting);
+    }
+    menu.addMenuElement(this.curtainSetting);
+    menu.addMenuElement(this.taskBgImage);
+    const hasImage = VisualSettings.bgImage !== null || VisualSettings.bgGif !== null;
+    if (hasImage) {
+      menu.addMenuElement(this.bgModeSetting);
+      menu.addMenuElement(this.showBgSetting);
+    }
+    menu.addMenuElement(this.settingStringBack);
+    if (prevEl !== null) {
+      const idx = menu.vector.indexOf(prevEl);
+      menu.scrollToSelection(idx >= 0 ? idx : Math.min(prevIdx, menu.vector.length - 1));
+    } else if (prevIdx >= 0) {
+      menu.scrollToSelection(Math.min(prevIdx, menu.vector.length - 1));
+    }
+  }
   openMenu(gm, preserveSelection) {
     if (gm === null || gm === undefined) {
       return;
+    }
+    if (gm === this.gameMenuVisuals) {
+      this.rebuildVisualsMenu();
     }
     this.micro.gameCanvas?.hideBackButton();
     if (gm !== this.gameMenuMain && gm !== this.gameMenuFinished && gm !== null) {
@@ -994,6 +1034,7 @@ class MenuManager {
     if (menuElement === this.fillSetting) {
       VisualSettings.settings.fillEnabled = this.fillSetting.getCurrentOptionPos() === 0;
       VisualSettings.save();
+      this.rebuildVisualsMenu();
       return;
     }
     if (menuElement === this.fillModeSetting) {
@@ -1022,6 +1063,7 @@ class MenuManager {
     if (menuElement === this.showBgSetting) {
       VisualSettings.settings.showBgImage = this.showBgSetting.getCurrentOptionPos() === 0;
       VisualSettings.save();
+      this.rebuildVisualsMenu();
       return;
     }
     if (menuElement === this.curtainSetting) {

@@ -1,290 +1,238 @@
+// Управление левелпаками: ЛОКАЛЬНЫЕ источники.
+// Метаданные: data/packs_gdmod.json, data/packs_gdtr.json.
+// Файлы:     data/packs_gdmod.zip, data/packs_gdtr.zip (имена "<id>_...").
+// Ключи хранения — числовые, как раньше: gdmod == id, gdtr == 1000000 + id.
+// Это сохраняет совместимость с MRGCache, рекордами p<id>_ и gd-progress-<id>
+// (миграция не нужна). Прокси и HTML-скрапинг удалены.
 import { MRGCache } from "./MRGCache.js";
-const GDMOD_BASE = "https://gdmod.ru";
-const CLOUDFLARE_PROXY = "https://lively-dream-dcdb.myorgbot.workers.dev/?url=";
-const IS_LOCAL = ["localhost", "127.0.0.1"].includes(location.hostname);
-const CORS_PROXIES = [
-  ...(IS_LOCAL ? ["/proxy/"] : []),
-  // локальный прокси из server.py при разработке; в проде — только воркер
-  CLOUDFLARE_PROXY,
-  "https://api.allorigins.win/raw?url=",
-  // raw-ответ, без ключей, без жёстких лимитов
-  "https://api.codetabs.com/v1/proxy?quest=",
-  // raw-ответ, простой и стабильный
-  "https://cors.isomorphic-git.org/",
-  // прокси от проекта isomorphic-git, префикс + сырой URL
-  "https://corsproxy.io/?url=",
-  // был 401 — оставлен на случай восстановления
-  "https://api.cors.lol/?url=",
-  // был 429 — оставлен на случай восстановления
-  "https://proxy.corsfix.com/?"
-  // был 502 — оставлен на случай восстановления
-];
-class PackManager {
-  cache;
-  currentProxy;
-  constructor(proxyUrl) {
-    this.cache = new MRGCache();
-    this.customProxy = proxyUrl ?? null;
-    this.currentProxy = this.customProxy ?? CORS_PROXIES[0];
+import { LocalArchive } from "./LocalArchive.js";
+import { fetchPackFile } from "./LocalFiles.js";
+
+export const GDTR_OFFSET = 1000000;
+export const PACK_SOURCES = { gdmod: "gdmod", gdtr: "GDTR" };
+
+export function formatBytes(n) {
+  if (n == null || isNaN(n)) {
+    return "";
   }
+  if (n < 1024) {
+    return n + " B";
+  }
+  if (n < 1048576) {
+    return (n / 1024).toFixed(n < 10240 ? 1 : 0) + " KB";
+  }
+  return (n / 1048576).toFixed(1) + " MB";
+}
+
+// ISO "2020-02-15" / "15.02.2020" / "15/02/2020" -> ms; неразбор -> null
+export function normalizeDate(s) {
+  if (!s || typeof s !== "string") {
+    return null;
+  }
+  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (m) {
+    const t = Date.UTC(+m[1], +m[2] - 1, +m[3]);
+    return isNaN(t) ? null : t;
+  }
+  m = /^(\d{1,2})[./](\d{1,2})[./](\d{4})/.exec(s);
+  if (m) {
+    const t = Date.UTC(+m[3], +m[2] - 1, +m[1]);
+    return isNaN(t) ? null : t;
+  }
+  const t = Date.parse(s);
+  return isNaN(t) ? null : t;
+}
+
+// Каждый тип — в обе стороны. progress_* считается в PackGallery (нужен доступ к рекордам).
+const SORTS = {
+  date_desc: (a, b) => (b.addedTs ?? -1) - (a.addedTs ?? -1),
+  date_asc: (a, b) => (a.addedTs ?? Infinity) - (b.addedTs ?? Infinity),
+  name_desc: (a, b) => (b.name || "").localeCompare(a.name || ""),
+  name_asc: (a, b) => (a.name || "").localeCompare(b.name || ""),
+  author_desc: (a, b) => (b.author || "").localeCompare(a.author || ""),
+  author_asc: (a, b) => (a.author || "").localeCompare(b.author || ""),
+  tracks_desc: (a, b) => (b.tracksTotal || 0) - (a.tracksTotal || 0),
+  tracks_asc: (a, b) => (a.tracksTotal || 0) - (b.tracksTotal || 0),
+  downloads_desc: (a, b) => (b.downloads ?? -1) - (a.downloads ?? -1),
+  downloads_asc: (a, b) => (a.downloads ?? -1) - (b.downloads ?? -1),
+  originality_desc: (a, b) => (b.originality ?? -1) - (a.originality ?? -1),
+  originality_asc: (a, b) => (a.originality ?? -1) - (b.originality ?? -1),
+  size_desc: (a, b) => (b.mrgBytes || 0) - (a.mrgBytes || 0),
+  size_asc: (a, b) => (a.mrgBytes || 0) - (b.mrgBytes || 0),
+  saved_desc: (a, b) => (b.savedAt || 0) - (a.savedAt || 0),
+  saved_asc: (a, b) => (a.savedAt || 0) - (b.savedAt || 0),
+  source_desc: (a, b) => ((b.source || "") + (b.name || "")).localeCompare((a.source || "") + (a.name || "")),
+  source_asc: (a, b) => ((a.source || "") + (a.name || "")).localeCompare((b.source || "") + (b.name || "")),
+};
+
+export class PackManager {
+  constructor() {
+    this.cache = new MRGCache();
+    this.archives = { gdmod: LocalArchive.packs("gdmod"), gdtr: LocalArchive.packs("gdtr") };
+    this._catalogs = {};
+    // Поля окна каталога для PackMenu: раньше оценка с сервера, теперь честные —
+    // весь локальный каталог известен сразу.
+    this.windowStart = 0;
+    this.windowItems = [];
+    this.shortConfirmed = true;
+    this.lastSliceRawCount = 0;
+  }
+
   async init() {
+    // MRGCache сам лениво открывает БД в каждом методе; держим вызов для PackMenu
     await this.cache.open();
   }
-  setProxy(url) {
-    this.customProxy = url ?? null;
-    this.currentProxy = url ?? CORS_PROXIES[0];
+
+  static keyIdOf(source, id) {
+    return source === "gdtr" ? GDTR_OFFSET + Number(id) : Number(id);
   }
-  getProxy() {
-    return this.currentProxy;
+  static sourceOf(keyId) {
+    return Number(keyId) >= GDTR_OFFSET ? "gdtr" : "gdmod";
   }
-  async fetchWithProxy(url) {
-    // явно заданный прокси — только он
-    if (this.customProxy !== null) {
-      return this.tryFetch(this.customProxy + url, this.customProxy, url);
-    }
-    // прямой запрос не делаем: gdmod.ru не отдаёт CORS-заголовки,
-    // а браузер при этом пишет ошибку в консоль при каждом обращении
-    const errors = [];
-    for (const proxy of CORS_PROXIES) {
-      // часть прокси ждёт URL закодированным, часть — сырым; пробуем оба варианта
-      const variants = [...new Set([proxy + encodeURIComponent(url), proxy + url])];
-      for (const proxyUrl of variants) {
-        try {
-          const resp = await fetch(proxyUrl);
-          if (resp.ok) {
-            this.currentProxy = proxy;
-            return resp;
-          }
-          errors.push(`${proxy.split("//")[1]?.split("/")[0] ?? proxy} → HTTP ${resp.status}`);
-        } catch (e) {
-          errors.push(`${proxy.split("//")[1]?.split("/")[0] ?? proxy} → ${e.name}`);
-        }
-      }
-    }
-    throw new Error(`Все CORS-прокси недоступны: ${errors.join("; ")}`);
+  static srcIdOf(keyId) {
+    const n = Number(keyId);
+    return n >= GDTR_OFFSET ? n - GDTR_OFFSET : n;
   }
-  async tryFetch(proxyUrl, proxy, targetUrl) {
-    const resp = await fetch(proxyUrl);
-    if (!resp.ok) {
-      throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
-    }
-    this.currentProxy = proxy;
-    return resp;
-  }
-  // gdmod.ru отдаёт страницы в windows-1251: resp.text() дал бы mojibake (�/ромбы)
-  async readResponseText(resp) {
-    const buf = await resp.arrayBuffer();
-    const ct = resp.headers.get("content-type") || "";
-    const m = ct.match(/charset=([^;]+)/i);
-    if (m) {
-      try {
-        return new TextDecoder(m[1].trim()).decode(buf);
-      } catch {
-        return new TextDecoder("windows-1251").decode(buf);
-      }
-    }
-    try {
-      return new TextDecoder("utf-8", { fatal: true }).decode(buf);
-    } catch {
-      return new TextDecoder("windows-1251").decode(buf);
-    }
-  }
-  // === Оконный кэш каталога: тянем по 200 паков с сервера, отдаём UI-страницами по 20 ===
-  windowItems = [];
-  windowStart = 0;
-  windowEnd = 0;
-  catalogEnd = null;
-  confirmedShortPages = new Set();
-  static WINDOW_SIZE = 200;
-  async fetchWindow(globalStart) {
-    const size = PackManager.WINDOW_SIZE;
-    // нумерация страниц gdmod.ru НАЧИНАЕТСЯ С НУЛЯ: ?page=0 — первая страница
-    const serverPage = Math.floor(globalStart / size);
-    // gdmod.ru иногда отдаёт усечённую страницу; частичное окно подтверждаем
-    // одним повтором и запоминаем — повторно сеть не дёргаем
-    this.shortConfirmed = false;
-    let items = [];
-    let maxAttempts = this.confirmedShortPages.has(serverPage) ? 1 : 3;
-    for (let attempt = 0; attempt < maxAttempts; ++attempt) {
-      if (attempt > 0) {
-        await new Promise((res) => setTimeout(res, 600));
-      }
-      const got = await this.fetchPackList(serverPage, size);
-      if (got.length > items.length) {
-        items = got;
-      }
-      if (items.length >= size) {
-        break;
-      }
-      if (items.length > 0) {
-        maxAttempts = Math.min(maxAttempts, 2);
+
+  // ---- метаданные каталогов ----
+  async _catalog(source) {
+    if (!this._catalogs[source]) {
+      const data = await this.archives[source].json();
+      const list = data.items
+        .filter((it) => it.hasMrg !== false && it.mrgSize != null)
+        .map((it) => this._normalize(source, it));
+      list.sort(SORTS.date_desc);
+      this._catalogs[source] = list;
+      if (source === "gdmod") {
+        // окно PackMenu: весь каталог известен
+        this.windowStart = 0;
+        this.windowItems = list;
         this.shortConfirmed = true;
-        this.confirmedShortPages.add(serverPage);
       }
     }
-    this.windowItems = items;
-    this.windowStart = serverPage * size;
-    this.windowEnd = this.windowStart + items.length;
-    // ВАЖНО: не фиксируем «конец каталога» по короткому окну — gdmod периодически
-    // отдаёт усечённые страницы; конец определяет PackMenu по пустой странице
+    return this._catalogs[source];
   }
-  async getUiPage(uiPage, uiPerPage = 20) {
-    const start = (uiPage - 1) * uiPerPage;
-    const end = start + uiPerPage;
-    if (start < this.windowStart || end > this.windowEnd) {
-      await this.fetchWindow(start);
-    }
-    const from = start - this.windowStart;
-    const slice = this.windowItems.slice(from, from + uiPerPage);
-    this.lastSliceRawCount = slice.length;
-    // GDLVL-only паки (без MRG) не скачать/не играть — не показываем в Browse
-    return slice.filter((p) => p.hasMrg);
-  }
-  // Простая постраничная загрузка (0-based): одна UI-страница = один запрос.
-  // При усечённом ответе — до 3 попыток, берём максимум.
-  async fetchPage(zeroBasedPage, perPage = 50) {
-    let items = [];
-    let maxAttempts = 3;
-    for (let attempt = 0; attempt < maxAttempts; ++attempt) {
-      if (attempt > 0) {
-        await new Promise((res) => setTimeout(res, 600));
-      }
-      try {
-        const got = await this.fetchPackList(zeroBasedPage, perPage);
-        if (got.length > items.length) {
-          items = got;
-        }
-        if (items.length >= perPage) {
-          break;
-        }
-        // частичная страница (0 < n < perPage) — типичный конец каталога:
-        // одного подтверждения достаточно; пустой ответ — до 3 попыток
-        if (items.length > 0) {
-          maxAttempts = Math.min(maxAttempts, 2);
-        }
-      } catch {
-      }
-    }
-    return items;
-  }
-  async fetchPackList(page = 1, perPage = 50) {
-    const url = `${GDMOD_BASE}/tracks/?onpage=${perPage}&page=${page}`;
-    const resp = await this.fetchWithProxy(url);
-    const html = await this.readResponseText(resp);
-    return this.parsePackListHtml(html);
-  }
-  parsePackListHtml(html) {
-    const tracks = [];
-    const rowRegex = /<tr[^>]*>(.*?)<\/tr>/gs;
-    const rows = html.match(rowRegex) ?? [];
-    for (const row of rows) {
-      if (!row.includes("/tracks/id/")) continue;
-      const idMatch = row.match(/href='\/tracks\/id\/(\d+)'>(.*?)<\/a>/);
-      const levelsMatch = row.match(/href='\/tracks\/id\/\d+\/\?do=list'>(.*?)<\/a>/);
-      const authorMatch = row.match(/href='\/tracks\/author\/(\d+)'>(.*?)<\/a>/);
-      const mrgSizeMatch = row.match(/MRG\s*<\/a>\s*<span class='size'>(.*?)<\/span>/);
-      const gdlvlMatch = row.match(/href='(\/\?get=gdlvl&id=\d+)'/);
-      const gdlvlSizeMatch = row.match(/GDLVL\s*<\/a>\s*<span class='size'>(.*?)<\/span>/);
-      if (idMatch) {
-        // levels/MRG/author могут отсутствовать у GDLVL-only паков — они неиграбельны
-        // для нас, но должны СЧИТАТЬСЯ в окне, иначе пагинация обрывается раньше времени
-        tracks.push({
-          id: parseInt(idMatch[1], 10),
-          name: this.unescapeHtml(idMatch[2].trim()),
-          author: authorMatch ? this.unescapeHtml(authorMatch[2].trim()) : "",
-          authorId: authorMatch ? parseInt(authorMatch[1], 10) : 0,
-          levels: levelsMatch?.[1]?.trim() ?? "",
-          hasMrg: mrgSizeMatch !== null,
-          mrgSize: mrgSizeMatch?.[1]?.trim() ?? "",
-          gdlvlSize: gdlvlSizeMatch?.[1]?.trim(),
-          hasGdlvl: !!gdlvlMatch
-        });
-      }
-    }
-    return tracks;
-  }
-  async fetchPackDetail(id) {
-    const url = `${GDMOD_BASE}/tracks/id/${id}`;
-    const resp = await this.fetchWithProxy(url);
-    const html = await this.readResponseText(resp);
-    return this.parsePackDetailHtml(html, id);
-  }
-  parsePackDetailHtml(html, id) {
-    const titleMatch = html.match(/<title>(.*?)<\/title>/);
-    const authorMatch = html.match(/Автор:<\/b>\s*<a[^>]*>(.*?)<\/a>/);
-    const authorIdMatch = html.match(/Автор:<\/b>\s*<a href='\/tracks\/author\/(\d+)'/);
-    const levelsMatch = html.match(/Уровни:<\/b>\s*<a[^>]*>(.*?)<\/a>/);
-    const originalityMatch = html.match(/Оригинальность:<\/b>\s*<b><span[^>]*>(.*?)<\/span>/);
-    const dateMatch = html.match(/Добавлен:<\/b>\s*([^<]+)/);
-    const downloadsMatch = html.match(/Скачиваний:\s*(\d+)/);
-    const mrgSizeMatch = html.match(/MRG\s*<\/a>\s*<span class="size">(.*?)<\/span>/);
+  _normalize(source, it) {
+    const breakdown = Array.isArray(it.levelsBreakdown) ? it.levelsBreakdown : [0, 0, 0];
     return {
-      id,
-      name: this.unescapeHtml(titleMatch?.[1]?.split("|")[0]?.trim() ?? "Unknown"),
-      author: this.unescapeHtml(authorMatch?.[1]?.trim() ?? ""),
-      authorId: parseInt(authorIdMatch?.[1] ?? "0", 10),
-      levels: levelsMatch?.[1]?.trim() ?? "",
-      originality: originalityMatch?.[1]?.trim() ?? "",
-      date: dateMatch?.[1]?.trim() ?? "",
-      downloads: downloadsMatch ? parseInt(downloadsMatch[1], 10) : void 0,
-      mrgSize: mrgSizeMatch?.[1]?.trim() ?? "",
-      hasGdlvl: html.includes("get=gdlvl"),
-      downloadedAt: 0
+      id: PackManager.keyIdOf(source, it.id),
+      srcId: Number(it.id),
+      source,
+      name: it.name ?? "Pack " + it.id,
+      author: it.author ?? "",
+      authorId: it.authorId ?? null,
+      levels: breakdown.join("/"),
+      levelsBreakdown: breakdown,
+      tracksTotal: it.tracks ?? breakdown.reduce((s, n) => s + n, 0),
+      mrgBytes: it.mrgSize ?? null,
+      mrgSize: formatBytes(it.mrgSize),
+      downloads: it.downloads ?? null,
+      originality: it.originality ?? null,
+      addedRaw: it.added ?? null,
+      addedTs: normalizeDate(it.added),
+      hasMrg: true,
+      hasGdlvl: false,
     };
   }
-  async downloadPack(id) {
-    const cached = await this.cache.getPack(id);
-    if (cached) {
-      return { buffer: cached.mrgBuffer, metadata: cached.metadata };
-    }
-    const url = `${GDMOD_BASE}/?get=levels.mrg&id=${id}`;
-    const resp = await this.fetchWithProxy(url);
-    const buffer = await resp.arrayBuffer();
-    let metadata = (await this.cache.getAllMetadata()).find((m) => m.id === id);
-    if (!metadata) {
-      const detail = await this.fetchPackDetail(id);
-      metadata = { ...detail, downloadedAt: Date.now() };
-    }
-    await this.cache.savePack(id, buffer, metadata);
-    return { buffer, metadata };
+  async catalogSize(source) {
+    return (await this._catalog(source)).length;
   }
-  async getPackBlobUrl(id) {
-    const cachedUrl = await this.cache.getPackBlobUrl(id);
-    if (cachedUrl) return cachedUrl;
-    const { buffer } = await this.downloadPack(id);
-    const blob = new Blob([buffer], { type: "application/octet-stream" });
-    return URL.createObjectURL(blob);
+
+  // ---- выборка для PackGallery: сортировка на полном массиве, потом страница ----
+  async catalogPage(source, uiPage, uiPerPage, { sort = "date_desc", hideDownloaded = false, query = "" } = {}) {
+    const all = await this._catalog(source);
+    const cmp = SORTS[sort] || SORTS.date_desc;
+    const q = query.trim().toLowerCase();
+    const cached = new Map((await this.getCachedPacks()).map((m) => [m.id, m]));
+    const decorated = [];
+    for (const it of all) {
+      const meta = cached.get(it.id);
+      if (hideDownloaded && meta) {
+        continue;
+      }
+      if (q && !(it.name || "").toLowerCase().includes(q)) {
+        continue;
+      }
+      decorated.push(meta ? { ...it, downloaded: true, cachedMeta: meta } : { ...it, downloaded: false });
+    }
+    decorated.sort(cmp);
+    const totalItems = decorated.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / uiPerPage));
+    const page = Math.min(Math.max(1, uiPage), totalPages);
+    return { items: decorated.slice((page - 1) * uiPerPage, page * uiPerPage), totalItems, totalPages, page };
   }
+
+  // ---- выборка для PackMenu (вкладка browse — каталог gdmods) ----
+  async getUiPage(uiPage, uiPerPage) {
+    const all = await this._catalog("gdmod");
+    const items = all.slice((uiPage - 1) * uiPerPage, uiPage * uiPerPage);
+    this.lastSliceRawCount = items.length;
+    return items;
+  }
+
+  // ---- сохранённые паки ----
   async getCachedPacks() {
     return this.cache.getAllMetadata();
   }
   async isPackCached(id) {
     return this.cache.hasPack(id);
   }
+  async savedList() {
+    const metas = await this.getCachedPacks();
+    const out = [];
+    for (const meta of metas) {
+      const source = PackManager.sourceOf(meta.id);
+      const srcId = PackManager.srcIdOf(meta.id);
+      let extra = { mrgBytes: null, addedTs: null, addedRaw: null };
+      try {
+        const cat = await this._catalog(source);
+        const it = cat.find((c) => c.srcId === srcId);
+        if (it) {
+          extra = { mrgBytes: it.mrgBytes, addedTs: it.addedTs, addedRaw: it.addedRaw };
+        }
+      } catch {
+      }
+      out.push({ ...meta, source, savedAt: meta.savedAt || 0, ...extra });
+    }
+    return out;
+  }
+
+  // ---- получение .mrg: extract из zip -> тот же кэш-пайплайн, что раньше ----
+  async downloadPack(id) {
+    const source = PackManager.sourceOf(id);
+    const srcId = PackManager.srcIdOf(id);
+    const cat = await this._catalog(source);
+    const entry = cat.find((c) => c.srcId === srcId);
+    if (!entry) {
+      throw new Error("Pack not in catalog: " + source + "/" + srcId);
+    }
+    // файл пака: data/packs_<source>/<id>.mrg (строгое имя, манифест не нужен)
+    const blob = await fetchPackFile(source, srcId);
+    const buffer = await blob.arrayBuffer();
+    const metadata = {
+      id: Number(id),
+      name: entry.name,
+      author: entry.author,
+      levels: entry.levels,
+      levelsBreakdown: entry.levelsBreakdown,
+      tracksTotal: entry.tracksTotal,
+      mrgSize: entry.mrgSize,
+      mrgBytes: entry.mrgBytes,
+      savedAt: Date.now(),
+    };
+    await this.cache.savePack(Number(id), buffer, metadata);
+    return { buffer, metadata };
+  }
+  async getPackBlobUrl(id) {
+    return this.cache.getPackBlobUrl(id);
+  }
   async deletePack(id) {
-    return this.cache.deletePack(id);
+    await this.cache.deletePack(id);
   }
   async clearCache() {
-    return this.cache.clearAll();
+    await this.cache.clearAll();
   }
-  getCacheSize() {
+  async getCacheSize() {
     return this.cache.getCacheSize();
   }
-  unescapeHtml(text) {
-    const map = {
-      "&amp;": "&",
-      "&lt;": "<",
-      "&gt;": ">",
-      "&quot;": '"',
-      "&#039;": "'",
-      "&mdash;": "\u2014",
-      "&ndash;": "\u2013"
-    };
-    return text
-      .replace(/&(?:amp|lt|gt|quot|#039|mdash|ndash);/g, (m) => map[m] ?? m)
-      .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)));
-  }
 }
-export {
-  PackManager
-};

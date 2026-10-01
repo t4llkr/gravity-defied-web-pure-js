@@ -1,70 +1,61 @@
-// Каталог скинов gdmod.ru: оконное кэширование (как у паков), парсинг таблицы скинов.
-const GDMOD_SKINS_BASE = "https://gdmod.ru";
+// Каталог скинов из локального data/skins.json (399 записей, окна любого размера).
+import { LocalArchive } from "./LocalArchive.js";
+import { formatBytes, normalizeDate } from "./PackManager.js";
+
+const SORTS = {
+  date_desc: (a, b) => (b.addedTs ?? -1) - (a.addedTs ?? -1),
+  date_asc: (a, b) => (a.addedTs ?? Infinity) - (b.addedTs ?? Infinity),
+  downloads_desc: (a, b) => (b.downloads ?? -1) - (a.downloads ?? -1),
+  downloads_asc: (a, b) => (a.downloads ?? -1) - (b.downloads ?? -1),
+  name_desc: (a, b) => (b.name || "").localeCompare(a.name || ""),
+  name_asc: (a, b) => (a.name || "").localeCompare(b.name || ""),
+  author_desc: (a, b) => (b.author || "").localeCompare(a.author || ""),
+  author_asc: (a, b) => (a.author || "").localeCompare(b.author || ""),
+};
+
 export class SkinCatalog {
-  constructor(packManager) {
-    this.pm = packManager;
-    this.confirmedShortPages = new Set();
-    this.windowItems = [];
-    this.windowStart = 0;
-    this.windowEnd = 0;
-    this.catalogEnd = null;
+  constructor() {
+    this.archive = LocalArchive.skins();
+    this._items = null;
+    this.totalItems = 0;
+    this.lastSliceRawCount = 0;
   }
-  static WINDOW_SIZE = 200;
-  static ROW_RE = /<tr><td><a href='\/skins\/id\/(\d+)'>([^<]*)<\/a><\/td><td><img src='([^']+)'[^>]*><\/td><td><a href='\/skins\/author\/\d+'>([^<]*)<\/a>/g;
-  parseSkinsHtml(html) {
-    const items = [];
-    SkinCatalog.ROW_RE.lastIndex = 0;
-    let m;
-    while ((m = SkinCatalog.ROW_RE.exec(html)) !== null) {
-      items.push({
-        id: parseInt(m[1], 10),
-        name: m[2].trim(),
-        thumbUrl: m[3].startsWith("http") ? m[3] : GDMOD_SKINS_BASE + m[3],
-        author: m[4].trim()
-      });
+
+  async _load() {
+    if (!this._items) {
+      const data = await this.archive.json();
+      const items = data.items.map((it) => ({
+        id: Number(it.id),
+        name: it.name ?? "Skin " + it.id,
+        author: it.author ?? "",
+        authorId: it.authorId ?? null,
+        addedRaw: it.added ?? null,
+        addedTs: normalizeDate(it.added),
+        downloads: it.downloads ?? null,
+        zipBytes: it.zipSize ?? null,
+        zipSize: formatBytes(it.zipSize),
+      }));
+      items.sort(SORTS.date_desc);
+      this._items = items;
+      this.totalItems = items.length;
     }
+    return this._items;
+  }
+
+  sortList(sort, query = "") {
+    const cmp = SORTS[sort] || SORTS.date_desc;
+    const q = query.trim().toLowerCase();
+    const all = this._items.slice().sort(cmp);
+    return q ? all.filter((it) => (it.name || "").toLowerCase().includes(q)) : all;
+  }
+
+  // Совместимость со SkinGallery: возвращает страницу массивом
+  async getUiPage(uiPage, uiPerPage, sort = "date_desc", query = "") {
+    await this._load();
+    const all = this.sortList(sort, query);
+    const items = all.slice((uiPage - 1) * uiPerPage, uiPage * uiPerPage);
+    this.lastSliceRawCount = items.length;
+    this.lastTotal = all.length;
     return items;
-  }
-    async fetchWindow(globalStart) {
-    const size = SkinCatalog.WINDOW_SIZE;
-    // нумерация страниц gdmod.ru НАЧИНАЕТСЯ С НУЛЯ: /skins/page/0/ — первая страница
-    const serverPage = Math.floor(globalStart / size);
-    const pageUrl = `${GDMOD_SKINS_BASE}/skins/page/${serverPage}/?onpage=${size}`;
-    // gdmod иногда отдаёт усечённую страницу: 3 попытки, берём максимум
-    let items = [];
-    // уже подтверждённое короткое окно повторно не запрашиваем
-    let maxAttempts = this.confirmedShortPages.has(serverPage) ? 1 : 3;
-    for (let attempt = 0; attempt < maxAttempts; ++attempt) {
-      if (attempt > 0) {
-        await new Promise((res) => setTimeout(res, 600));
-      }
-      try {
-        const resp = await this.pm.fetchWithProxy(pageUrl);
-        const got = this.parseSkinsHtml(await this.pm.readResponseText(resp));
-        if (got.length > items.length) {
-          items = got;
-        }
-        if (items.length >= size) {
-          break;
-        }
-        if (items.length > 0) {
-          maxAttempts = Math.min(maxAttempts, 2);
-          this.confirmedShortPages.add(serverPage);
-        }
-      } catch {
-      }
-    }
-    this.windowItems = items;
-    this.windowStart = serverPage * size;
-    this.windowEnd = this.windowStart + items.length;
-  }
-  async getUiPage(uiPage, uiPerPage = 20) {
-    const start = (uiPage - 1) * uiPerPage;
-    const end = start + uiPerPage;
-    if (start < this.windowStart || end > this.windowEnd) {
-      await this.fetchWindow(start);
-    }
-    const from = start - this.windowStart;
-    return this.windowItems.slice(from, from + uiPerPage);
   }
 }
