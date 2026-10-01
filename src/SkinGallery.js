@@ -509,6 +509,14 @@ export function openSkinGallery(skinManager, catalog) {
         if (removed) {
           thumbCache.delete("s" + rec.id);
           toast("Skin deleted");
+          // удалён текущий скин — сразу переключаемся на дефолт
+          if (skinManager.currentId === rec.id) {
+            try {
+              await skinManager.applyDefault();
+            } catch (e) {
+              console.error("SkinGallery: applyDefault after delete failed", e);
+            }
+          }
         }
         renderSaved();
       });

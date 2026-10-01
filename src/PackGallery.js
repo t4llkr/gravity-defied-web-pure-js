@@ -122,6 +122,27 @@ export function openPackGallery(menuManager, packMenu) {
 
   let busyId = null;
 
+  // флаги "непроходимый": localStorage gd-pack-flags {keyId: 1}; красная обводка
+  const FLAGS_KEY = "gd-pack-flags";
+  let packFlags = {};
+  try {
+    packFlags = JSON.parse(window.localStorage.getItem(FLAGS_KEY) || "{}");
+  } catch {
+  }
+  const isFlagged = (id) => !!packFlags[id];
+  const toggleFlag = (id) => {
+    if (packFlags[id]) {
+      delete packFlags[id];
+    } else {
+      packFlags[id] = 1;
+    }
+    try {
+      window.localStorage.setItem(FLAGS_KEY, JSON.stringify(packFlags));
+    } catch {
+    }
+    render();
+  };
+
   const overlay = document.createElement("div");
   overlay.style.cssText = wrapCss;
 
@@ -280,9 +301,9 @@ export function openPackGallery(menuManager, packMenu) {
   // state: "current" (зелёная), "completed" (синяя — 100%), "failed" (красная).
   // metaAtBottom (каталог): всё, кроме названия, прижимается к низу карточки —
   // длинные названия не сдвигают мета-строки соседних блоков.
-  function card(name, sub, author, state, onClick, cssExtra = "", statusText = "", rows = null, metaAtBottom = false) {
+  function card(name, sub, author, state, onClick, cssExtra = "", statusText = "", rows = null, metaAtBottom = false, onFlag = null, onDelete = null) {
     const t = document.createElement("div");
-    t.style.cssText = "background:#16181d;border:2px solid #3a3d45;border-radius:10px;padding:12px;cursor:pointer;display:flex;flex-direction:column;gap:6px;min-height:120px;" + cssExtra;
+    t.style.cssText = "position:relative;background:#16181d;border:2px solid #3a3d45;border-radius:10px;padding:12px;cursor:pointer;display:flex;flex-direction:column;gap:6px;min-height:120px;" + cssExtra;
     if (state === "current") {
       t.style.borderColor = "#4a8";
     } else if (state === "completed") {
@@ -342,8 +363,126 @@ export function openPackGallery(menuManager, packMenu) {
       }
     }
     t.onclick = onClick;
+    if (onFlag) {
+      const f = document.createElement("button");
+      f.textContent = "⚠";
+      f.title = "Mark as impossible";
+      const active = isFlagged(onFlag.id);
+      f.style.cssText = "position:absolute;top:4px;left:4px;width:20px;height:20px;line-height:1;padding:0;background:" + (active ? "#5a2e2e" : "#22242a") + ";border:1px solid " + (active ? "#a55" : "#444") + ";color:" + (active ? "#f88" : "#999") + ";border-radius:4px;cursor:pointer;font-size:11px;opacity:0;transition:opacity 0.15s;";
+      t.onmouseenter = () => { f.style.opacity = "1"; };
+      t.onmouseleave = () => { f.style.opacity = "0"; };
+      f.onclick = (e) => {
+        e.stopPropagation();
+        toggleFlag(onFlag.id);
+      };
+      t.appendChild(f);
+    }
+    if (onDelete) {
+      const x = document.createElement("button");
+      x.textContent = "✕";
+      x.title = "Delete";
+      x.style.cssText = "position:absolute;top:4px;right:4px;width:20px;height:20px;line-height:1;padding:0;background:#3a2222;border:1px solid #6a3a3a;color:#e99;border-radius:4px;cursor:pointer;font-size:11px;opacity:0;transition:opacity 0.15s;";
+      t.onmouseenter = () => {
+        x.style.opacity = "1";
+        if (onFlag) {
+          const fb = t.querySelector("button[title='Mark as impossible']");
+          if (fb) {
+            fb.style.opacity = "1";
+          }
+        }
+      };
+      t.onmouseleave = () => {
+        x.style.opacity = "0";
+        if (onFlag) {
+          const fb = t.querySelector("button[title='Mark as impossible']");
+          if (fb) {
+            fb.style.opacity = "0";
+          }
+        }
+      };
+      x.onclick = (e) => {
+        e.stopPropagation();
+        onDelete();
+      };
+      t.appendChild(x);
+    }
     return t;
   }
+
+  // модал удаления пака: "soft" — только пак, "progress" — пак + рекорды, null — отмена
+  const confirmDeletePack = (name) => {
+    return new Promise((resolve) => {
+      const box = document.createElement("div");
+      box.style.cssText = "position:fixed;inset:0;z-index:700;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;";
+      const cardEl = document.createElement("div");
+      cardEl.style.cssText = "background:#1d1f24;border:1px solid #444;border-radius:10px;padding:18px 20px;max-width:340px;display:flex;flex-direction:column;gap:14px;";
+      const msg = document.createElement("div");
+      msg.textContent = `Delete pack "${name}"?`;
+      msg.style.cssText = "color:#eee;font-size:14px;word-break:break-word;";
+      const hint = document.createElement("div");
+      hint.textContent = '"Delete pack" keeps records — restored on re-download. "Delete with progress" clears records; the pack starts locked next time.';
+      hint.style.cssText = "color:#999;font-size:12px;";
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;";
+      const mk = (label, danger, fn) => {
+        const b = document.createElement("button");
+        b.textContent = label;
+        b.style.cssText = "background:" + (danger ? "#7a2e2e" : "#22242a") + ";border:1px solid #555;color:#eee;padding:7px 14px;border-radius:6px;cursor:pointer;font-size:13px;";
+        b.onclick = fn;
+        return b;
+      };
+      const done = (v) => { box.remove(); resolve(v); };
+      row.append(
+        mk("Cancel", false, () => done(null)),
+        mk("Delete pack", true, () => done("soft")),
+        mk("Delete with progress", true, () => done("progress"))
+      );
+      cardEl.append(msg, hint, row);
+      box.appendChild(cardEl);
+      box.onclick = (e) => { if (e.target === box) { done(null); } };
+      overlay.appendChild(box);
+    });
+  };
+
+  // удаление сохранённого пака; mode: "soft" | "progress".
+  // Жёсткий режим повторяет игровой "Clear highscore": рекорды выметаются через
+  // RecordStore.deleteRecordStore (чистит и кэш RecordStore.opened, и localStorage),
+  // gd-progress-<id> удаляется; живое in-memory состояние сбрасывается, чтобы
+  // saveProgressToStorage при смене пака не записал старые разблокировки обратно.
+  const deleteSavedPack = async (meta, mode) => {
+    await pm.deletePack(meta.id);
+    if (mode === "progress") {
+      try {
+        const { RecordStore } = await import("./rms/RecordStore.js");
+        const recPrefix = "p" + meta.id + "_";
+        for (const name of RecordStore.listRecordStores()) {
+          if (name !== "GWTRStates" && name.startsWith(recPrefix)) {
+            RecordStore.deleteRecordStore(name);
+          }
+        }
+      } catch (e) {
+        console.error("PackGallery: record store cleanup failed, id=" + meta.id, e);
+      }
+      try {
+        window.localStorage.removeItem("gd-progress-" + meta.id);
+      } catch {
+      }
+      if (menuManager.currentPackId === meta.id) {
+        menuManager.availableLeagues = 0;
+        menuManager.maxAvailableLevel = 1;
+        if (menuManager.unlockedTracksByLevel) {
+          menuManager.unlockedTracksByLevel[0] = 0;
+          menuManager.unlockedTracksByLevel[1] = 0;
+          menuManager.unlockedTracksByLevel[2] = -1;
+        }
+      }
+    }
+    if (menuManager.currentPackId === meta.id) {
+      await packMenu.onCachedPackSelected({ id: 0, name: "Original levels", author: "built-in", levels: "", mrgSize: "", hasGdlvl: false });
+    }
+    toast(mode === "progress" ? "Pack and progress deleted" : "Pack deleted");
+    render();
+  };
 
   const progressOf = (meta) => {
     const done = countCompletedPerDifficulty(meta.id);
@@ -357,15 +496,24 @@ export function openPackGallery(menuManager, packMenu) {
 
   // Карточка сохранённого пака — используется и во вкладке Saved, и в каталоге
   // для уже скачанных паков (синяя рамка при 100%, кликабельна).
-  // showSource — только вкладка Saved: источник строкой мета над автором
+  // showSource — только вкладка Saved: источник строкой мета над автором + удаление
   const savedCard = (meta, currentId, metaAtBottom = false, showSource = false) => {
     const p = progressOf(meta);
-    const state = currentId === meta.id ? "current" : p.doneAll ? "completed" : "";
+    let state = currentId === meta.id ? "current" : p.doneAll ? "completed" : "";
+    if (isFlagged(meta.id)) {
+      state = "failed";
+    }
     return card(meta.name, showSource ? (PACK_SOURCES[meta.source] || meta.source || "") : null,
       meta.author || (showSource ? "" : PACK_SOURCES[meta.source || "gdmod"]), state, async () => {
       await packMenu.onCachedPackSelected({ id: meta.id, name: meta.name, author: meta.author, levels: "", mrgSize: "", hasGdlvl: false });
       render();
-    }, "", "", p.rows, metaAtBottom);
+    }, "", "", p.rows, metaAtBottom, { id: meta.id },
+      showSource ? async () => {
+        const mode = await confirmDeletePack(meta.name);
+        if (mode) {
+          await deleteSavedPack(meta, mode);
+        }
+      } : null);
   };
 
   const mkBtn = (label, onClick, disabled) => {
@@ -415,7 +563,7 @@ export function openPackGallery(menuManager, packMenu) {
         g.appendChild(savedCard(meta, currentId, true));
         continue;
       }
-      const borderState = currentId === it.id ? "current" : "";
+      const borderState = isFlagged(it.id) ? "failed" : currentId === it.id ? "current" : "";
       const subParts = [it.levels];
       if (it.downloads != null) {
         subParts.push(it.downloads + " dl");
@@ -444,7 +592,7 @@ export function openPackGallery(menuManager, packMenu) {
         if (ok) {
           toast("Saved! Find it in the Saved tab");
         }
-      }, "", busy ? "Downloading..." : "", null, true));
+      }, "", busy ? "Downloading..." : "", null, true, { id: it.id }));
     }
     pager.append(
       mkBtn("◀ Prev", () => { if (page > 1) { setPage(page - 1); renderCatalog(); } }, page <= 1),
@@ -474,10 +622,11 @@ export function openPackGallery(menuManager, packMenu) {
       : LETTERS.map((letter, i) => ({ letter, done: origDone[i], total: 0 }));
     const origDoneAll = origRows.every((r) => r.total > 0 && r.done >= r.total);
     const origState = currentId === 0 ? "current" : origDoneAll ? "completed" : "";
-    g.appendChild(card("Original levels", null, "built-in", origState, async () => {
+    const origFlagState = isFlagged(0) ? "failed" : origState;
+    g.appendChild(card("Original levels", null, "built-in", origFlagState, async () => {
       await packMenu.onCachedPackSelected({ id: 0, name: "Original levels", author: "built-in", levels: "", mrgSize: "", hasGdlvl: false });
       renderSaved();
-    }, "", "", origRows));
+    }, "", "", origRows, false, { id: 0 }));
     let saved = [];
     try {
       saved = await pm.savedList();
