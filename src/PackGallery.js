@@ -423,19 +423,19 @@ export function openPackGallery(menuManager, packMenu) {
       hint.textContent = '"Delete pack" keeps records — restored on re-download. "Delete with progress" clears records; the pack starts locked next time.';
       hint.style.cssText = "color:#999;font-size:12px;";
       const row = document.createElement("div");
-      row.style.cssText = "display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;";
+      row.style.cssText = "display:flex;flex-direction:column;gap:8px;";
       const mk = (label, danger, fn) => {
         const b = document.createElement("button");
         b.textContent = label;
-        b.style.cssText = "background:" + (danger ? "#7a2e2e" : "#22242a") + ";border:1px solid #555;color:#eee;padding:7px 14px;border-radius:6px;cursor:pointer;font-size:13px;";
+        b.style.cssText = "width:100%;box-sizing:border-box;background:" + (danger ? "#7a2e2e" : "#22242a") + ";border:1px solid " + (danger ? "#a55" : "#555") + ";color:#eee;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:13px;";
         b.onclick = fn;
         return b;
       };
       const done = (v) => { box.remove(); resolve(v); };
       row.append(
-        mk("Cancel", false, () => done(null)),
         mk("Delete pack", true, () => done("soft")),
-        mk("Delete with progress", true, () => done("progress"))
+        mk("Delete with progress", true, () => done("progress")),
+        mk("Cancel", false, () => done(null))
       );
       cardEl.append(msg, hint, row);
       box.appendChild(cardEl);
@@ -503,8 +503,11 @@ export function openPackGallery(menuManager, packMenu) {
     if (isFlagged(meta.id)) {
       state = "failed";
     }
-    return card(meta.name, showSource ? (PACK_SOURCES[meta.source] || meta.source || "") : null,
-      meta.author || (showSource ? "" : PACK_SOURCES[meta.source || "gdmod"]), state, async () => {
+    const srcLabel = PACK_SOURCES[meta.source] || meta.source || "";
+    const authorLine = showSource
+      ? [meta.author, srcLabel].filter(Boolean).join(" · ")
+      : (meta.author || PACK_SOURCES[meta.source || "gdmod"]);
+    return card(meta.name, null, authorLine, state, async () => {
       await packMenu.onCachedPackSelected({ id: meta.id, name: meta.name, author: meta.author, levels: "", mrgSize: "", hasGdlvl: false });
       render();
     }, "", "", p.rows, metaAtBottom, { id: meta.id },
