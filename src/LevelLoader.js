@@ -180,8 +180,10 @@ class LevelLoader {
     if (this.gameLevel === null) {
       return;
     }
-    canvas.setColor(...VisualSettings.lineRGB());
-    this.gameLevel.renderTrackNearestGreenLine(canvas);
+    // линия поверхности — основной цвет линий (в обоих режимах)
+    const rgb = VisualSettings.lineRGB();
+    canvas.setColor(...rgb);
+    this.gameLevel.renderTrackNearestGreenLine(canvas, rgb);
   }
   updateVisiblePointRange(var1, var2, var3) {
     if (this.gameLevel === null) {

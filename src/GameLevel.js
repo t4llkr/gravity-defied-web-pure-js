@@ -139,12 +139,16 @@ class GameLevel {
       var11 = GamePhysics.getSmthLikeMaxAbs(var9, var10);
       var9 = divideF16(var9, var11 >> 1 >> 1);
       var10 = divideF16(var10, var11 >> 1 >> 1);
+      // нижняя (дальняя) линия стены — тёмный производный (верхняя — основной)
+      gameCanvas.setColor(...VisualSettings.lineRGBDark());
       gameCanvas.drawLine(
         this.pointPositions[lineNo][0] + var4 << 3 >> 16,
         this.pointPositions[lineNo][1] + var5 << 3 >> 16,
         this.pointPositions[lineNo + 1][0] + var9 << 3 >> 16,
         this.pointPositions[lineNo + 1][1] + var10 << 3 >> 16
       );
+      // коннектор поверхность→стена — тёмный производный оттенок
+      gameCanvas.setColor(...VisualSettings.lineRGBDark());
       gameCanvas.drawLine(
         this.pointPositions[lineNo][0] << 3 >> 16,
         this.pointPositions[lineNo][1] << 3 >> 16,
@@ -178,12 +182,14 @@ class GameLevel {
       }
       ++lineNo;
     }
+    gameCanvas.setColor(...VisualSettings.lineRGBDark());
     gameCanvas.drawLine(
       this.pointPositions[this.pointsCount - 1][0] << 3 >> 16,
       this.pointPositions[this.pointsCount - 1][1] << 3 >> 16,
       this.pointPositions[this.pointsCount - 1][0] + var9 << 3 >> 16,
       this.pointPositions[this.pointsCount - 1][1] + var10 << 3 >> 16
     );
+    gameCanvas.setColor(...VisualSettings.lineRGB());
     if (LevelLoader.isEnabledShadows) {
       this.renderShadow(gameCanvas, var7, var8);
     }
@@ -254,7 +260,8 @@ class GameLevel {
     }
   }
 
-  renderTrackNearestGreenLine(gameCanvas) {
+  renderTrackNearestGreenLine(gameCanvas, lineRGB = null) {
+    const restoreRGB = lineRGB || VisualSettings.lineRGB();
     let pointNo = 0;
     for (pointNo = 0; pointNo < this.pointsCount - 1 && this.pointPositions[pointNo][0] <= this.minX; ++pointNo) {
     }
@@ -273,14 +280,14 @@ class GameLevel {
           this.pointPositions[this.startFlagPoint][0] << 3 >> 16,
           this.pointPositions[this.startFlagPoint][1] << 3 >> 16
         );
-        gameCanvas.setColor(...VisualSettings.lineRGB());
+        gameCanvas.setColor(...restoreRGB);
       }
       if (this.finishFlagPoint === pointNo) {
         gameCanvas.renderFinishFlag(
           this.pointPositions[this.finishFlagPoint][0] << 3 >> 16,
           this.pointPositions[this.finishFlagPoint][1] << 3 >> 16
         );
-        gameCanvas.setColor(...VisualSettings.lineRGB());
+        gameCanvas.setColor(...restoreRGB);
       }
       if (this.pointPositions[pointNo][0] > this.maxX) {
         break;

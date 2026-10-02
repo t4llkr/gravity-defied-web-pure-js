@@ -1,7 +1,7 @@
 // Настройки визуала (глобальные). Хранение: localStorage, ключ "gd-visual".
 export class VisualSettings {
   static settings = {
-    lineColor: "#00aa00",
+    lineColor: "#00ff00",
     bgColor: "#ffffff",
     fillEnabled: false,
     fillColor: "#008800",
@@ -97,6 +97,14 @@ export class VisualSettings {
   }
   static lineRGB() {
     return this.rgb(this.settings.lineColor);
+  }
+
+  // тёмный производный оттесок линий (стена/коннекторы в 3D): lineRGB × 0.667 —
+  // отношение (0,170,0)/(0,255,0) из оригинального порта
+  static lineRGBDark() {
+    const c = VisualSettings.lineRGB();
+    const k = 0.667;
+    return [Math.min(255, Math.round(c[0] * k)), Math.min(255, Math.round(c[1] * k)), Math.min(255, Math.round(c[2] * k))];
   }
   static bgRGB() {
     return this.rgb(this.settings.bgColor);
