@@ -4,6 +4,20 @@ Browser port of the J2ME classic **Gravity Defied** (moto-trial racing). This re
 
 Beyond the port itself, the game has been extended with major features the original web version did not have: **level packs** (now from two community archives), **skins** and **visual customization** — **fully offline**: all content is served as static files from `data/`, no proxies, no workers, no runtime scraping.
 
+## Running locally
+
+No build step: serve the repository root with any static file server and open it in a browser.
+
+```bash
+# Python (no dependencies)
+python3 -m http.server 8000
+
+# or Node.js
+npx serve .
+```
+
+Then open `http://localhost:8000`. Any equivalent works — VS Code «Live Server», nginx, GitHub Pages, and so on. Opening `index.html` directly via `file://` will **not** work: the game is built from ES modules, which browsers only load over HTTP(S).
+
 ## Level packs
 
 - **Two catalogs**: **gdmod** (gdmod.ru) and **GDTR** (gdtr.net) — separate tabs in the gallery, one flat namespace (`gdtr` ids are offset by 1 000 000 internally, so caches, records and progress never collide between sources).
